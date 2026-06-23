@@ -4,10 +4,6 @@
 ![Status](https://img.shields.io/badge/status-early%20development-orange)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-An **agentic exporter** for internal network reconnaissance and security posture assessment. Deployed inside a client environment, the exporter autonomously enumerates hosts, collects patch and vulnerability state, inventories servers and applications, and streams normalized findings back to the **Lorikeet Security** platform for triage, correlation, and reporting.
-
-It exists to close the detection gap between point-in-time engagements: instead of a once-a-year snapshot, the exporter gives continuous, always-on internal visibility, the live internal attack-surface picture that scheduled pentests miss.
-
 ---
 
 ## Overview
