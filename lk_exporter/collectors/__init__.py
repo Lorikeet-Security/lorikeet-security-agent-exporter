@@ -21,7 +21,6 @@ def get_collector(name: str, **kwargs) -> BaseCollector:
         "inventory": InventoryCollector,
         "patch": PatchCollector,
         "posture": PostureCollector,
-        "supply_chain": SupplyChainCollector,
     }
     cls = mapping.get(name)
     if cls is None:

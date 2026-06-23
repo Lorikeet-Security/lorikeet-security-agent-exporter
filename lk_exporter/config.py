@@ -74,7 +74,7 @@ class Config:
             except ValueError:
                 pass  # single hostname – allowed
 
-        valid_modules = {"discovery", "patch", "inventory", "posture", "supply_chain"}
+        valid_modules = {"discovery", "patch", "inventory", "posture"}
         for mod in self.modules:
             if mod not in valid_modules:
                 errors.append(f"Unknown module: {mod!r}")

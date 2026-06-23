@@ -57,6 +57,14 @@ class DiscoveryCollector(BaseCollector):
                     findings.extend(self._emit(info))
 
         self.log.info("Discovery: %d live hosts found", sum(1 for f in findings if f.category == "live-host"))
+
+        # Supply chain checks run as part of discovery (local-host analysis).
+        from lk_exporter.collectors.supply_chain import SupplyChainCollector
+        sc = SupplyChainCollector(scope=self.scope, concurrency=self.concurrency)
+        sc_findings = sc.collect()
+        self.log.info("Discovery/supply-chain: %d findings", len(sc_findings))
+        findings.extend(sc_findings)
+
         return findings
 
     def _probe_host(self, ip: str) -> HostInfo | None:
