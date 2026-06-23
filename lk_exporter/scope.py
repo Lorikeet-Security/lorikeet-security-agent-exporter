@@ -53,15 +53,21 @@ class ScopeEnforcer:
         return [h for h in hosts if self.is_in_scope(h)]
 
     def enumerate_ips(self) -> list[str]:
-        """Yield all individual IPs from configured CIDR ranges.
+        """Return all individual IPs from configured CIDR ranges.
 
-        Skips network and broadcast addresses for /31 and larger.
-        Capped at 65 536 IPs per range to avoid runaway enumeration.
+        /32 → single host. /31 → both addresses (RFC 3021). Larger → .hosts()
+        (excludes network/broadcast). Capped at 65 536 IPs per range.
         """
         ips: list[str] = []
         for net in self._networks:
-            hosts = list(net.hosts()) if net.num_addresses > 2 else [net.network_address]
-            ips.extend(str(h) for h in hosts[:65536])
+            if net.num_addresses == 1:
+                # /32 — single host
+                ips.append(str(net.network_address))
+            elif net.num_addresses == 2:
+                # /31 — both addresses are usable (RFC 3021)
+                ips.extend(str(a) for a in net)
+            else:
+                ips.extend(str(h) for h in list(net.hosts())[:65536])
         ips.extend(self._hostnames)
         return ips
 

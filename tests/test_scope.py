@@ -46,8 +46,22 @@ def test_enumerate_ips_small_cidr():
     ips = scope.enumerate_ips()
     assert "10.0.0.1" in ips
     assert "10.0.0.6" in ips
-    assert "10.0.0.0" not in ips  # network address excluded
-    assert "10.0.0.7" not in ips  # broadcast excluded
+    assert "10.0.0.0" not in ips  # network address excluded for /29
+    assert "10.0.0.7" not in ips  # broadcast excluded for /29
+
+
+def test_enumerate_ips_slash32():
+    scope = ScopeEnforcer(["10.10.10.5/32"])
+    ips = scope.enumerate_ips()
+    assert ips == ["10.10.10.5"]
+
+
+def test_enumerate_ips_slash31():
+    scope = ScopeEnforcer(["10.0.0.0/31"])
+    ips = scope.enumerate_ips()
+    assert "10.0.0.0" in ips  # RFC 3021 - both usable
+    assert "10.0.0.1" in ips
+    assert len(ips) == 2
 
 
 def test_enumerate_ips_hostname():

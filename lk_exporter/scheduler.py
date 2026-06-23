@@ -83,8 +83,14 @@ class Scheduler:
                 log.exception("Posture collector failed")
 
         self._report(all_findings)
-        accepted = self.transport.send(all_findings)
-        log.info("Cycle %d complete: %d findings, %d accepted by platform", self._cycle, len(all_findings), accepted)
+        try:
+            accepted = self.transport.send(all_findings)
+            log.info("Cycle %d complete: %d findings, %d accepted by platform", self._cycle, len(all_findings), accepted)
+        except Exception:
+            # Transport failures must not crash the collection loop.
+            # Findings are generated regardless; the next cycle will retry.
+            log.exception("Cycle %d: transport error - findings not delivered this cycle", self._cycle)
+            accepted = 0
         return all_findings
 
     def run_continuous(self) -> None:

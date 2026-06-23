@@ -17,8 +17,8 @@ if TYPE_CHECKING:
 
 log = logging.getLogger("lk_exporter.transport")
 
-_VALIDATE_PATH = "/ingest/v1/validate"
-_FINDINGS_PATH = "/ingest/v1/findings"
+_VALIDATE_PATH = "/v1/validate"
+_FINDINGS_PATH = "/v1/findings"
 _BATCH_SIZE = 100
 _TIMEOUT = 30.0
 
