@@ -119,16 +119,39 @@ def run(once: bool, config_path: str, with_mcp: bool) -> None:
 
     log = logging.getLogger("lk_exporter.cli")
 
+    from lk_exporter.scope import ScopeEnforcer as _SE
+    _scope_preview = _SE(cfg.scope)
+    _ip_count = len(_scope_preview.enumerate_ips())
+
+    _scope_line = (", ".join(cfg.scope[:3]) + (" ..." if len(cfg.scope) > 3 else ""))
+    _scope_line += f"  ({_ip_count} hosts)"
+
+    _module_names = ", ".join(cfg.modules)
+
+    if cfg.using_platform():
+        _platform_line = cfg.platform_url or ""
+        _mode_line = "Platform-connected  (findings → Lorikeet Security)"
+    else:
+        _platform_line = "not configured"
+        _mode_line = "Standalone  (findings printed to stdout)"
+
     console.print(Panel(
         Text.assemble(
-            ("Lorikeet Security Agent Exporter ", "bold white"),
+            ("Lorikeet Security Agent Exporter", "bold white"),
+            ("  ", ""),
             (f"v{__version__}", "dim"),
             "\n",
-            (f"Agent ID: {cfg.agent_id}", "dim"),
+            ("Internal network reconnaissance and security posture assessment\n", "dim italic"),
             "\n",
-            (f"Scope:    {', '.join(cfg.scope[:3])}" + (" ..." if len(cfg.scope) > 3 else ""), "cyan"),
+            ("Agent ID:  ", "dim"), (cfg.agent_id, "dim"),
             "\n",
-            (f"Modules:  {', '.join(cfg.modules)}", "green"),
+            ("Scope:     ", "dim"), (_scope_line, "cyan"),
+            "\n",
+            ("Modules:   ", "dim"), (_module_names, "green"),
+            "\n",
+            ("Platform:  ", "dim"), (_platform_line, "blue"),
+            "\n",
+            ("Mode:      ", "dim"), (_mode_line, "yellow" if cfg.using_platform() else "dim"),
         ),
         title="[bold red]Authorized use only[/bold red]",
         border_style="dim",
