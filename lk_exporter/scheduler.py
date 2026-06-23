@@ -31,17 +31,20 @@ class Scheduler:
         config: "Config",
         scope: "ScopeEnforcer",
         transport: "PlatformTransport | StdoutTransport",
+        verbose: bool = False,
     ) -> None:
         self.config = config
         self.scope = scope
         self.transport = transport
+        self.verbose = verbose
         self._cycle = 0
 
     def run_once(self) -> list[Finding]:
         """Execute a single collection cycle."""
         self._cycle += 1
         log.info("=== Collection cycle %d starting ===", self._cycle)
-        console.rule(f"[bold]Collection cycle {self._cycle}[/bold]")
+        if self.verbose:
+            console.rule(f"[bold]Collection cycle {self._cycle}[/bold]")
 
         all_findings: list[Finding] = []
         discovered_hosts: list[str] | None = None
@@ -82,14 +85,29 @@ class Scheduler:
             except Exception:
                 log.exception("Posture collector failed")
 
-        self._report(all_findings)
+        if self.verbose:
+            self._report(all_findings)
         try:
             accepted = self.transport.send(all_findings)
             log.info("Cycle %d complete: %d findings, %d accepted by platform", self._cycle, len(all_findings), accepted)
+            if not self.verbose:
+                _sev_counts = {}
+                for f in all_findings:
+                    _sev_counts[f.severity] = _sev_counts.get(f.severity, 0) + 1
+                _sev_parts = [
+                    f"[bold red]{_sev_counts['critical']} critical[/bold red]" if _sev_counts.get("critical") else "",
+                    f"[red]{_sev_counts['high']} high[/red]" if _sev_counts.get("high") else "",
+                    f"[yellow]{_sev_counts['medium']} medium[/yellow]" if _sev_counts.get("medium") else "",
+                ]
+                _sev_str = "  ".join(p for p in _sev_parts if p)
+                _finding_str = f"{len(all_findings)} findings" + (f"  ({_sev_str})" if _sev_str else "")
+                console.print(f"[dim]Cycle {self._cycle} — {_finding_str}[/dim]")
         except Exception:
             # Transport failures must not crash the collection loop.
             # Findings are generated regardless; the next cycle will retry.
             log.exception("Cycle %d: transport error - findings not delivered this cycle", self._cycle)
+            if not self.verbose:
+                console.print(f"[yellow]Cycle {self._cycle} — transport error, findings not delivered[/yellow]")
             accepted = 0
         return all_findings
 
@@ -101,7 +119,8 @@ class Scheduler:
             self.run_once()
             if interval > 0:
                 log.info("Sleeping %s before next cycle", self.config.interval)
-                console.print(f"[dim]Next cycle in {self.config.interval}...[/dim]")
+                if self.verbose:
+                    console.print(f"[dim]Next cycle in {self.config.interval}...[/dim]")
                 time.sleep(interval)
             else:
                 log.info("Continuous mode: starting next cycle immediately")

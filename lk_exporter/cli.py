@@ -22,8 +22,9 @@ _VERSION_MESSAGE = (
 )
 
 
-def _setup_logging(level: str) -> None:
-    numeric = getattr(logging, level.upper(), logging.INFO)
+def _setup_logging(level: str, verbose: bool = False) -> None:
+    effective = level if verbose else "warning"
+    numeric = getattr(logging, effective.upper(), logging.WARNING)
     logging.basicConfig(
         level=numeric,
         format="%(asctime)s  %(levelname)-7s  %(name)s  %(message)s",
@@ -101,9 +102,11 @@ def main() -> None:
 @click.option("--once", is_flag=True, default=False, help="Run a single collection cycle and exit.")
 @click.option("--config", "config_path", default="config.yaml", show_default=True,
               help="Path to the YAML config file.")
-@click.option("--mcp", "with_mcp", is_flag=True, default=False,
+@click.option("--agent-mode", "with_mcp", is_flag=True, default=False,
               help="Also start the MCP server on stdio alongside the agent.")
-def run(once: bool, config_path: str, with_mcp: bool) -> None:
+@click.option("--verbose", "-v", is_flag=True, default=False,
+              help="Show detailed log output. By default only warnings and errors are printed.")
+def run(once: bool, config_path: str, with_mcp: bool, verbose: bool) -> None:
     """Run the collection agent.
 
     By default, runs continuously at the configured interval.
@@ -115,7 +118,7 @@ def run(once: bool, config_path: str, with_mcp: bool) -> None:
     from lk_exporter.scheduler import Scheduler
 
     cfg = load(config_path)
-    _setup_logging(cfg.log_level)
+    _setup_logging(cfg.log_level, verbose=verbose)
 
     log = logging.getLogger("lk_exporter.cli")
 
@@ -176,9 +179,14 @@ def run(once: bool, config_path: str, with_mcp: bool) -> None:
         log.info("Platform transport: %s", cfg.platform_url)
     else:
         transport = StdoutTransport(cfg.agent_id)
-        console.print("[dim]No platform_url configured - findings will be printed to stdout.[/dim]")
+        if not verbose:
+            console.print("[dim]No platform_url configured — findings will be printed to stdout.[/dim]")
 
-    scheduler = Scheduler(cfg, scope, transport)
+    if not verbose:
+        _dest = cfg.platform_url.split("//")[-1].split("/")[0] if cfg.platform_url else "stdout"
+        console.print(f"\n[green]●[/green]  Agent connected and running  ·  every [cyan]{cfg.interval}[/cyan]  ·  {_dest}\n")
+
+    scheduler = Scheduler(cfg, scope, transport, verbose=verbose)
 
     if with_mcp:
         import threading
