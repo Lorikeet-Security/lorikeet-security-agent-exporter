@@ -93,9 +93,22 @@ def _test_config_cb(ctx: click.Context, param: click.Parameter, value: bool) -> 
 @click.version_option(__version__, prog_name="lk-exporter", message=_VERSION_MESSAGE)
 @click.option("--test-config", is_flag=True, default=False, is_eager=True,
               expose_value=False, callback=_test_config_cb,
-              help="Validate config.yaml and exit.")
+              help="Quick-check default config.yaml and exit.")
 def main() -> None:
-    """Lorikeet Security Agent Exporter - internal network reconnaissance and posture assessment."""
+    """Internal-network reconnaissance and continuous security posture assessment.
+
+    Runs collectors against authorized scope, fingerprints findings over time,
+    and ships results to the Lorikeet Security platform or stdout.
+
+    \b
+    Common usage:
+      lk-exporter validate              check config, scope, and platform creds
+      lk-exporter run --once            one collection cycle (cron / systemd)
+      lk-exporter run                   continuous mode, every <interval>
+      lk-exporter run -v                verbose: full logs + per-cycle table
+      lk-exporter mcp                   MCP server only (Claude Desktop / Lory)
+      lk-exporter run --agent-mode      collection + MCP server on stdio
+    """
 
 
 @main.command()
@@ -103,14 +116,23 @@ def main() -> None:
 @click.option("--config", "config_path", default="config.yaml", show_default=True,
               help="Path to the YAML config file.")
 @click.option("--agent-mode", "with_mcp", is_flag=True, default=False,
-              help="Also start the MCP server on stdio alongside the agent.")
+              help=(
+                  "Expose MCP tools on stdio while collection runs in the background. "
+                  "Use this when an AI orchestrator (Lory, Claude Desktop) is managing "
+                  "the process — it hands stdin/stdout to the MCP protocol. "
+                  "Not for interactive terminal use."
+              ))
 @click.option("--verbose", "-v", is_flag=True, default=False,
-              help="Show detailed log output. By default only warnings and errors are printed.")
+              help="Full log output and per-cycle findings table. Quiet by default.")
 def run(once: bool, config_path: str, with_mcp: bool, verbose: bool) -> None:
-    """Run the collection agent.
+    """Run the collection agent (continuous or one-shot).
 
-    By default, runs continuously at the configured interval.
-    Use --once for a single cycle (cron/systemd friendly).
+    \b
+    Modes:
+      default      continuous — loops at configured interval until stopped
+      --once       single cycle then exit (cron / systemd timer friendly)
+      --agent-mode collection + MCP stdio server for AI orchestration
+      -v           verbose logs and findings table printed each cycle
     """
     from lk_exporter.config import load
     from lk_exporter.scope import ScopeEnforcer
@@ -275,12 +297,15 @@ def run(once: bool, config_path: str, with_mcp: bool, verbose: bool) -> None:
 @click.option("--config", "config_path", default="config.yaml", show_default=True,
               help="Path to the YAML config file.")
 def validate(config_path: str) -> None:
-    """Validate config and scope without running any collection.
+    """Check config, scope, and platform credentials without collecting.
 
+    \b
     Checks:
-      - Config parses correctly and required fields are present
-      - Scope is non-empty and all entries are valid CIDRs or hostnames
-      - If platform_url is set, license key and agent token are valid and the endpoint is reachable
+      config        parses correctly, required fields present
+      scope         non-empty, valid CIDRs / hostnames
+      platform      license key valid and endpoint reachable (if configured)
+
+    Run this before every new deployment.
     """
     from lk_exporter.config import load
     from lk_exporter.scope import ScopeEnforcer
@@ -333,10 +358,13 @@ def validate(config_path: str) -> None:
 @main.command()
 @click.option("--config", "config_path", default="config.yaml", show_default=True)
 def mcp(config_path: str) -> None:
-    """Start the MCP stdio server (without running collection).
+    """MCP stdio server only — no scheduled collection.
 
-    Exposes tools for on-demand collection, status queries, and scope validation
-    to MCP-compatible orchestration layers.
+    Exposes agent tools to an MCP client (Claude Desktop, Lory, any MCP host)
+    over stdin/stdout. The client can trigger on-demand collection cycles,
+    run recon tools, query findings, and validate scope.
+
+    For scheduled collection alongside MCP, use: lk-exporter run --agent-mode
     """
     from lk_exporter.config import load
     from lk_exporter.scope import ScopeEnforcer
