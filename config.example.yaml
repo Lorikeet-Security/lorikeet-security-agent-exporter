@@ -39,3 +39,36 @@ log_level: info
 # Agent ID - auto-generated on first run and persisted to .lk_state/agent.json.
 # You can pin it here to keep a stable identity across reinstalls.
 # agent_id: "your-uuid-here"
+
+# ---------------------------------------------------------------------------
+# Multi-agent coordination
+# ---------------------------------------------------------------------------
+# Run a coordinator HTTP server so peer agents on other segments can pull
+# this agent's findings. Supply a peer_secret for shared-secret auth.
+# coordinator_port: 8765
+# peer_secret: ${LK_PEER_SECRET}
+
+# Peer agents to pull discovered hosts and findings from each cycle.
+# peers:
+#   - http://10.1.0.5:8765    # DMZ agent
+#   - http://10.2.0.9:8765    # OT segment agent
+
+# ---------------------------------------------------------------------------
+# Auto-close loop
+# ---------------------------------------------------------------------------
+# When a finding is absent for `auto_close_grace_cycles` consecutive cycles
+# it is marked closed and a close notification is sent to the platform.
+auto_close_enabled: true
+auto_close_grace_cycles: 2
+
+# ---------------------------------------------------------------------------
+# Webhooks
+# ---------------------------------------------------------------------------
+# Fire HTTP POSTs when findings at or above `severity_threshold` are detected.
+# Payloads are HMAC-SHA256 signed when a secret is provided (X-LK-Signature header).
+# webhooks:
+#   - url: https://hooks.example.com/security
+#     severity_threshold: high    # critical | high | medium | low | info
+#     secret: ${LK_WEBHOOK_SECRET}
+#   - url: https://slack-webhook.example.com/alerts
+#     severity_threshold: critical

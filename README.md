@@ -323,7 +323,7 @@ Earlier phases harden the core collection loop; later phases deepen accuracy, br
 Phase 1  ####################  100%   Core hardening        (shipped)
 Phase 2  ####................   ~20%  Accuracy & depth
 Phase 3  ###.................   ~15%  Coverage expansion    (supply chain shipped)
-Phase 4  #########...........   ~45%  Orchestration         (MCP + Lory tools shipped)
+Phase 4  ##################..   ~90%  Orchestration         (shipped)
 Phase 5  ....................     0%  Intelligence
 ```
 
@@ -336,8 +336,8 @@ Credentialed deep inventory, authenticated config-audit collectors (CIS-style), 
 **Phase 3 - Coverage expansion** `in progress`
 Supply chain: npm package discovery + OSV CVE lookup + malicious-package detection *(shipped)*. Remaining: Active-Directory-aware discovery, pluggable CVE / threat-intel feeds, KEV and EPSS prioritization, cloud and hybrid asset discovery, container / Kubernetes collectors.
 
-**Phase 4 - Orchestration & automation** `in progress`
-On-demand collection over MCP *(shipped)*, Lory AI pentest integration — `scan_host`, `discover_hosts`, `grab_banner`, `check_web_endpoint`, `run_nmap_script`, `dns_lookup` *(shipped)*. Remaining: multi-agent coordination across segmented networks, remediation-tracking loop with auto-close, alerting and webhooks for high-severity findings.
+**Phase 4 - Orchestration & automation** `shipped`
+On-demand collection over MCP *(shipped)*, Lory AI pentest integration — `scan_host`, `discover_hosts`, `grab_banner`, `check_web_endpoint`, `run_nmap_script`, `dns_lookup` *(shipped)*, multi-agent coordination — per-agent coordinator HTTP server + peer pull client, `list_peers` / `get_peer_findings` MCP tools *(shipped)*, remediation-tracking auto-close loop — finding fingerprinting, grace-cycle counter, synthetic close notifications *(shipped)*, alerting webhooks — HMAC-signed HTTP POST on high-severity findings and close events, configurable per-target threshold *(shipped)*. Remaining: agent-to-agent task delegation across segments.
 
 **Phase 5 - Intelligence** `planned`
 Risk-based prioritization (exploitability x exposure x criticality), attack-path mapping, drift baselining with anomaly detection, optional safe-validation of select findings.

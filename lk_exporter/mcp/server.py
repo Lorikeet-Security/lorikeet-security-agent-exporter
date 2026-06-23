@@ -693,6 +693,97 @@ def dns_lookup(hostname: str) -> str:
     return json.dumps(result, indent=2)
 
 
+@mcp.tool()
+def list_peers() -> str:
+    """Return the health and status of all configured peer agents.
+
+    Useful for verifying that peer agents in other network segments are
+    reachable and actively collecting. Shows per-peer cycle count,
+    last cycle timestamp, finding count, and discovered host count.
+
+    Returns:
+        JSON list of peer status objects. Each entry includes url,
+        agent_id, cycle_count, last_cycle_at, open_findings,
+        discovered_hosts, and an error key if the peer is unreachable.
+    """
+    config = _state.get("config")
+    if not config or not getattr(config, "peers", None):
+        return json.dumps({"peers": [], "message": "No peers configured"})
+
+    try:
+        from lk_exporter.coordinator import PeerClient
+        client = PeerClient(config.peers, peer_secret=getattr(config, "peer_secret", None))
+        statuses = client.statuses()
+        return json.dumps({"peers": statuses}, indent=2)
+    except Exception as exc:
+        return json.dumps({"error": str(exc)})
+
+
+@mcp.tool()
+def get_peer_findings(peer_url: str | None = None) -> str:
+    """Pull findings and discovered hosts from peer agents.
+
+    Fetches the latest collection cycle results from one or all configured
+    peers. Useful for correlating findings across segmented network
+    environments without waiting for the next scheduled cycle.
+
+    Args:
+        peer_url: Specific peer URL to query. If omitted, queries all peers.
+
+    Returns:
+        JSON with findings list, discovered_hosts list, and per-peer summary.
+    """
+    config = _state.get("config")
+    if not config or not getattr(config, "peers", None):
+        return json.dumps({"findings": [], "discovered_hosts": [], "message": "No peers configured"})
+
+    try:
+        from lk_exporter.coordinator import PeerClient
+        peers = [peer_url] if peer_url else config.peers
+        client = PeerClient(peers, peer_secret=getattr(config, "peer_secret", None))
+        data = client.pull_all()
+        return json.dumps(data, indent=2)
+    except Exception as exc:
+        return json.dumps({"error": str(exc)})
+
+
+@mcp.tool()
+def get_closed_findings(limit: int = 50) -> str:
+    """Return findings that have been auto-closed by the remediation-tracking loop.
+
+    The auto-close loop marks a finding as closed when it is absent for
+    `auto_close_grace_cycles` consecutive collection cycles, indicating
+    the underlying issue was remediated. This tool surfaces that history
+    for audit, reporting, or verification purposes.
+
+    Args:
+        limit: Maximum number of closed entries to return (default 50).
+
+    Returns:
+        JSON with a list of closed finding entries and summary counts.
+    """
+    try:
+        from lk_exporter.state_store import StateStore, _FINDINGS_FILE
+        if not _FINDINGS_FILE.exists():
+            return json.dumps({"closed": [], "message": "No state file found — agent may not have run yet"})
+
+        import json as _json
+        entries = _json.loads(_FINDINGS_FILE.read_text())
+        closed = [
+            {**v, "fingerprint": k}
+            for k, v in entries.items()
+            if v.get("state") == "closed"
+        ]
+        closed.sort(key=lambda x: x.get("last_seen", ""), reverse=True)
+        return json.dumps({
+            "closed_count": len(closed),
+            "open_count": sum(1 for v in entries.values() if v.get("state") == "open"),
+            "closed": closed[:limit],
+        }, indent=2)
+    except Exception as exc:
+        return json.dumps({"error": str(exc)})
+
+
 def init(config: Any, scope: Any, transport: Any, scheduler: Any) -> None:
     """Wire the MCP server to the running agent components."""
     _state["config"] = config

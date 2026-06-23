@@ -25,6 +25,8 @@ _ENV_VARS = {
     "log_level": "LK_LOG_LEVEL",
     "interval": "LK_INTERVAL",
     "concurrency": "LK_CONCURRENCY",
+    "coordinator_port": "LK_COORDINATOR_PORT",
+    "peer_secret": "LK_PEER_SECRET",
 }
 
 _INTERVAL_RE = re.compile(r"^(\d+)(s|m|h|d)$")
@@ -33,6 +35,13 @@ _TOKEN_RE = re.compile(r"^lk_agent_[0-9a-f]{32}$")
 
 STATE_DIR = Path(".lk_state")
 AGENT_STATE_FILE = STATE_DIR / "agent.json"
+
+
+@dataclass
+class WebhookConfig:
+    url: str
+    severity_threshold: str = "high"
+    secret: str | None = None
 
 
 @dataclass
@@ -46,6 +55,18 @@ class Config:
     concurrency: int = 16
     log_level: str = "info"
     agent_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+
+    # Multi-agent coordination
+    peers: list[str] = field(default_factory=list)
+    coordinator_port: int | None = None
+    peer_secret: str | None = None
+
+    # Auto-close loop
+    auto_close_enabled: bool = True
+    auto_close_grace_cycles: int = 2
+
+    # Webhooks
+    webhooks: list[WebhookConfig] = field(default_factory=list)
 
     # Parsed scope networks (populated by load())
     _networks: list[Any] = field(default_factory=list, repr=False)
@@ -78,6 +99,21 @@ class Config:
         for mod in self.modules:
             if mod not in valid_modules:
                 errors.append(f"Unknown module: {mod!r}")
+
+        if self.coordinator_port is not None:
+            if not (1 <= self.coordinator_port <= 65535):
+                errors.append("coordinator_port must be between 1 and 65535")
+
+        if self.auto_close_grace_cycles < 1:
+            errors.append("auto_close_grace_cycles must be >= 1")
+
+        valid_severities = {"critical", "high", "medium", "low", "info"}
+        for wh in self.webhooks:
+            if wh.severity_threshold not in valid_severities:
+                errors.append(
+                    f"Webhook severity_threshold {wh.severity_threshold!r} invalid; "
+                    f"must be one of: {', '.join(sorted(valid_severities))}"
+                )
 
         if self.using_platform():
             if not self.license_key:
@@ -150,6 +186,22 @@ def load(config_path: str | Path = "config.yaml") -> Config:
     modules = raw.get("modules", ["discovery", "patch", "inventory", "posture"])
     concurrency = int(get("concurrency", 16))
 
+    peers = raw.get("peers", [])
+    if isinstance(peers, str):
+        peers = [peers]
+
+    _coordinator_port_raw = get("coordinator_port", None)
+    coordinator_port = int(_coordinator_port_raw) if _coordinator_port_raw else None
+
+    webhooks: list[WebhookConfig] = []
+    for wh in raw.get("webhooks", []):
+        if isinstance(wh, dict) and wh.get("url"):
+            webhooks.append(WebhookConfig(
+                url=_resolve_env(wh["url"]),
+                severity_threshold=wh.get("severity_threshold", "high"),
+                secret=_resolve_env(wh["secret"]) if wh.get("secret") else None,
+            ))
+
     cfg = Config(
         scope=scope,
         platform_url=get("platform_url") or None,
@@ -160,6 +212,12 @@ def load(config_path: str | Path = "config.yaml") -> Config:
         concurrency=concurrency,
         log_level=str(get("log_level", "info")).lower(),
         agent_id=_load_agent_id(raw.get("agent_id")),
+        peers=peers,
+        coordinator_port=coordinator_port,
+        peer_secret=get("peer_secret") or None,
+        auto_close_enabled=bool(raw.get("auto_close_enabled", True)),
+        auto_close_grace_cycles=int(raw.get("auto_close_grace_cycles", 2)),
+        webhooks=webhooks,
     )
 
     return cfg

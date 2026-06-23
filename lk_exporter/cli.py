@@ -138,6 +138,12 @@ def run(once: bool, config_path: str, with_mcp: bool, verbose: bool) -> None:
         _platform_line = "not configured"
         _mode_line = "Standalone  (findings printed to stdout)"
 
+    _peers_line = f"{len(cfg.peers)} peer(s)" if cfg.peers else "none"
+    if cfg.coordinator_port:
+        _peers_line += f"  ·  coordinator on :{cfg.coordinator_port}"
+    _webhooks_line = f"{len(cfg.webhooks)} target(s)" if cfg.webhooks else "none"
+    _autoclose_line = f"enabled (grace: {cfg.auto_close_grace_cycles} cycles)" if cfg.auto_close_enabled else "disabled"
+
     console.print(Panel(
         Text.assemble(
             ("Lorikeet Security Agent Exporter", "bold white"),
@@ -155,6 +161,12 @@ def run(once: bool, config_path: str, with_mcp: bool, verbose: bool) -> None:
             ("Platform:  ", "dim"), (_platform_line, "blue"),
             "\n",
             ("Mode:      ", "dim"), (_mode_line, "yellow" if cfg.using_platform() else "dim"),
+            "\n",
+            ("Peers:     ", "dim"), (_peers_line, "magenta" if cfg.peers else "dim"),
+            "\n",
+            ("Webhooks:  ", "dim"), (_webhooks_line, "cyan" if cfg.webhooks else "dim"),
+            "\n",
+            ("Auto-close:", "dim"), (" " + _autoclose_line, "green" if cfg.auto_close_enabled else "dim"),
         ),
         title="[bold red]Authorized use only[/bold red]",
         border_style="dim",
@@ -186,7 +198,51 @@ def run(once: bool, config_path: str, with_mcp: bool, verbose: bool) -> None:
         _dest = cfg.platform_url.split("//")[-1].split("/")[0] if cfg.platform_url else "stdout"
         console.print(f"\n[green]●[/green]  Agent connected and running  ·  every [cyan]{cfg.interval}[/cyan]  ·  {_dest}\n")
 
-    scheduler = Scheduler(cfg, scope, transport, verbose=verbose)
+    # -- State store (auto-close loop) --
+    state_store = None
+    if cfg.auto_close_enabled:
+        from lk_exporter.state_store import StateStore
+        state_store = StateStore(grace_cycles=cfg.auto_close_grace_cycles)
+        log.info("Auto-close enabled (grace: %d cycles)", cfg.auto_close_grace_cycles)
+
+    # -- Webhook dispatcher --
+    webhook_dispatcher = None
+    if cfg.webhooks:
+        from lk_exporter.webhooks import WebhookDispatcher, WebhookTarget
+        targets = [
+            WebhookTarget(url=wh.url, severity_threshold=wh.severity_threshold, secret=wh.secret)
+            for wh in cfg.webhooks
+        ]
+        webhook_dispatcher = WebhookDispatcher(targets)
+        log.info("Webhooks enabled: %d target(s)", len(targets))
+
+    # -- Peer client (multi-agent coordination) --
+    peer_client = None
+    if cfg.peers:
+        from lk_exporter.coordinator import PeerClient
+        peer_client = PeerClient(cfg.peers, peer_secret=cfg.peer_secret)
+        log.info("Peer client: %d peer(s)", len(cfg.peers))
+
+    # -- Coordinator server --
+    if cfg.coordinator_port:
+        import threading as _threading
+        from lk_exporter.coordinator import CoordinatorServer, update_state
+        update_state(cfg.agent_id, cfg.peer_secret, [], [], 0)
+        coord_server = CoordinatorServer(cfg.coordinator_port)
+        coord_server.start()
+        if not verbose:
+            console.print(
+                f"[green]●[/green]  Coordinator API on :[cyan]{cfg.coordinator_port}[/cyan]"
+                + (f"  ·  [dim]{len(cfg.peers)} peer(s)[/dim]" if cfg.peers else "")
+            )
+
+    scheduler = Scheduler(
+        cfg, scope, transport,
+        verbose=verbose,
+        state_store=state_store,
+        webhook_dispatcher=webhook_dispatcher,
+        peer_client=peer_client,
+    )
 
     if with_mcp:
         import threading
@@ -195,6 +251,19 @@ def run(once: bool, config_path: str, with_mcp: bool, verbose: bool) -> None:
         t = threading.Thread(target=mcp_server.serve, daemon=True, name="mcp-stdio")
         t.start()
         log.info("MCP server started on stdio")
+
+        if cfg.using_platform():
+            from lk_exporter.mcp.relay import AgentRelay
+            relay = AgentRelay(
+                platform_url=cfg.platform_url,   # type: ignore[arg-type]
+                license_key=cfg.license_key,     # type: ignore[arg-type]
+                agent_token=cfg.agent_token,     # type: ignore[arg-type]
+                agent_id=cfg.agent_id,
+            )
+            relay.start()
+            if not verbose:
+                console.print("[dim]  Lory relay active — agent tools available to AI engagements[/dim]")
+            log.info("Lory relay poller started")
 
     if once:
         scheduler.run_once()
