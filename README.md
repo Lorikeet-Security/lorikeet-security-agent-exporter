@@ -174,19 +174,30 @@ Deploy only on networks you own or are **contractually engaged** to test. Unauth
 
 **Requirements:** Python 3.11+
 
+### From PyPI
+
 ```bash
-git clone https://github.com/<org>/lorikeet-security-agent-exporter.git
-cd lorikeet-security-agent-exporter
-
-# create and activate a virtual environment
-python -m venv .venv
-source .venv/bin/activate
-
-# install the package (registers the lk-exporter console script)
-pip install -e .
+pip install lorikeet-security-agent-exporter
 ```
 
-This installs the `lk-exporter` console entry point on your `PATH`. The agent is designed to run on a single host inside the target subnet; dependencies are pinned in `pyproject.toml`.
+### From source
+
+```bash
+git clone https://github.com/Lorikeet-Security/lorikeet-security-agent-exporter.git
+cd lorikeet-security-agent-exporter
+
+python -m venv .venv
+source .venv/bin/activate
+pip install .
+```
+
+### From GitHub (latest main)
+
+```bash
+pip install git+https://github.com/Lorikeet-Security/lorikeet-security-agent-exporter.git
+```
+
+All three methods register the `lk-exporter` console entry point on your `PATH`.
 
 ---
 
