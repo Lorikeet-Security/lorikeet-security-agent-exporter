@@ -1,0 +1,39 @@
+# Lorikeet Security Agent Exporter - example configuration
+# Copy to config.yaml and fill in real values.
+# Secrets should be supplied via environment variables, not committed.
+
+# REQUIRED: CIDR ranges / hostnames the agent is authorized to touch.
+# The scope enforcer is a hard gate; no collector contacts hosts outside this list.
+scope:
+  - 10.0.0.0/16
+  - 192.168.50.0/24
+  # - 10.10.1.5   # single hosts are allowed too
+
+# Platform ingest endpoint. Omit to run standalone (findings logged locally only).
+platform_url: https://lorikeetsecurity.com/ingest
+
+# License key - required only for platform ingest. Supply via env: LK_LICENSE_KEY
+license_key: ${LK_LICENSE_KEY}
+
+# Agent token - authenticates this agent to the platform. Supply via env: LK_AGENT_TOKEN
+agent_token: ${LK_AGENT_TOKEN}
+
+# Collection cadence: "continuous" for back-to-back cycles, or a duration like 6h, 24h, 30m.
+interval: 6h
+
+# Enabled collector modules. Comment out any you do not need.
+modules:
+  - discovery
+  - patch
+  - inventory
+  - posture
+
+# Max parallel host operations per cycle. Tune for network sensitivity.
+concurrency: 16
+
+# Log level: debug | info | warn | error
+log_level: info
+
+# Agent ID - auto-generated on first run and persisted to .lk_state/agent.json.
+# You can pin it here to keep a stable identity across reinstalls.
+# agent_id: "your-uuid-here"
