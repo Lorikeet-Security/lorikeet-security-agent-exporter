@@ -10,27 +10,6 @@ It exists to close the detection gap between point-in-time engagements: instead 
 
 ---
 
-## Table of Contents
-
-- [Overview](#overview)
-- [Why an agentic exporter](#why-an-agentic-exporter)
-- [Capabilities](#capabilities)
-- [Architecture](#architecture)
-- [Collector modules](#collector-modules)
-- [Finding schema](#finding-schema)
-- [Scope & authorization](#scope--authorization)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [Running the agent](#running-the-agent)
-- [Licensing](#licensing)
-- [Authentication](#authentication)
-- [Operational security](#operational-security)
-- [Roadmap](#roadmap)
-- [Contributing](#contributing)
-- [License](#license)
-
----
-
 ## Overview
 
 The Lorikeet Security Agent Exporter is a lightweight, self-directed collection agent that runs on the inside of a network. Once authorized and scoped, it performs continuous discovery and assessment without requiring an operator to drive each scan. Results are normalized into a consistent finding schema and shipped over an authenticated, outbound-only channel to the Lorikeet Security platform, where they feed into PTaaS workflows, dashboards, and reporting.
@@ -188,7 +167,7 @@ cd lorikeet-security-agent-exporter
 
 python -m venv .venv
 source .venv/bin/activate
-pip install .
+pip install . --break-system-packages
 ```
 
 ### From GitHub (latest main)
