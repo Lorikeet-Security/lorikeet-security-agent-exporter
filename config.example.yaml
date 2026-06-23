@@ -22,12 +22,13 @@ agent_token: ${LK_AGENT_TOKEN}
 interval: 6h
 
 # Enabled collector modules. Comment out any you do not need.
+# Supply chain analysis (npm crawl + OSV vuln lookup + malicious package detection)
+# runs automatically as part of discovery — no separate entry needed.
 modules:
   - discovery
   - patch
   - inventory
   - posture
-  - supply_chain    # filesystem npm crawl + OSV vuln lookup + malicious package detection
 
 # Max parallel host operations per cycle. Tune for network sensitivity.
 concurrency: 16
