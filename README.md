@@ -320,24 +320,24 @@ All traffic to the platform is authenticated and uses TLS; the channel is outbou
 Earlier phases harden the core collection loop; later phases deepen accuracy, broaden coverage, and extend orchestration on top of the existing MCP integration.
 
 ```
-Phase 1  ##################..  ~90%   Core hardening        (current)
-Phase 2  ####................  ~20%   Accuracy & depth
-Phase 3  ....................    0%   Coverage expansion
-Phase 4  ###.................  ~15%   Orchestration         (MCP shipped)
-Phase 5  ....................    0%   Intelligence
+Phase 1  ####################  100%   Core hardening        (shipped)
+Phase 2  ####................   ~20%  Accuracy & depth
+Phase 3  ###.................   ~15%  Coverage expansion    (supply chain shipped)
+Phase 4  #########...........   ~45%  Orchestration         (MCP + Lory tools shipped)
+Phase 5  ....................     0%  Intelligence
 ```
 
-**Phase 1 - Core hardening** `in progress`
-Agentic scheduler and scope-enforcement gate, normalized finding schema with temporal state, outbound-only authenticated transport with token rotation, `discovery` / `patch` / `inventory` collectors to GA, MCP orchestration *(shipped)*.
+**Phase 1 - Core hardening** `shipped`
+Agentic scheduler and scope-enforcement gate, normalized finding schema with temporal state, outbound-only authenticated transport with token rotation, `discovery` / `patch` / `inventory` / `posture` collectors to GA, supply chain collector (npm + OSV + malicious-package detection), MCP stdio server, pip-installable package with PyPI publish workflow, `--verbose` / `--agent-mode` / `--test-config` / `validate` CLI surface.
 
 **Phase 2 - Accuracy & depth** `planned`
 Credentialed deep inventory, authenticated config-audit collectors (CIS-style), service-level fingerprinting, confidence scoring, dedup and correlation against history.
 
-**Phase 3 - Coverage expansion** `planned`
-Active-Directory-aware discovery, pluggable CVE / threat-intel feeds, KEV and EPSS prioritization, cloud and hybrid asset discovery, container / Kubernetes collectors.
+**Phase 3 - Coverage expansion** `in progress`
+Supply chain: npm package discovery + OSV CVE lookup + malicious-package detection *(shipped)*. Remaining: Active-Directory-aware discovery, pluggable CVE / threat-intel feeds, KEV and EPSS prioritization, cloud and hybrid asset discovery, container / Kubernetes collectors.
 
-**Phase 4 - Orchestration & automation** `partially shipped`
-On-demand collection over MCP, multi-agent coordination across segmented networks, remediation-tracking loop with auto-close, alerting and webhooks for high-severity findings.
+**Phase 4 - Orchestration & automation** `in progress`
+On-demand collection over MCP *(shipped)*, Lory AI pentest integration — `scan_host`, `discover_hosts`, `grab_banner`, `check_web_endpoint`, `run_nmap_script`, `dns_lookup` *(shipped)*. Remaining: multi-agent coordination across segmented networks, remediation-tracking loop with auto-close, alerting and webhooks for high-severity findings.
 
 **Phase 5 - Intelligence** `planned`
 Risk-based prioritization (exploitability x exposure x criticality), attack-path mapping, drift baselining with anomaly detection, optional safe-validation of select findings.
