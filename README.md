@@ -229,6 +229,12 @@ log_level: info
 ## Running the agent
 
 ```bash
+# show version and licensing info
+lk-exporter --version
+
+# quick config check (validates config.yaml and exits)
+lk-exporter --test-config
+
 # one-shot collection cycle
 lk-exporter run --once
 
@@ -238,8 +244,15 @@ lk-exporter run
 # point at a specific config file
 lk-exporter run --config /etc/lorikeet/config.yaml
 
-# validate scope and config without collecting
+# also start the MCP stdio server alongside the agent
+lk-exporter run --mcp
+
+# full validation of config, scope, and platform reachability
 lk-exporter validate
+lk-exporter validate --config /etc/lorikeet/config.yaml
+
+# start MCP stdio server only (no collection)
+lk-exporter mcp
 ```
 
 The CLI is also available as a module if the console script is not on your `PATH`:
@@ -248,7 +261,9 @@ The CLI is also available as a module if the console script is not on your `PATH
 python -m lk_exporter run --once
 ```
 
-`validate` is recommended before every new deployment. It confirms the scope parses correctly and the allowlist is non-empty, and, if platform ingest is configured, that the license key is valid and the endpoint is reachable and authenticated, without contacting any target hosts.
+**`--test-config`** is a quick sanity check for the default `config.yaml`: it validates the file, enumerates the scope, and (if `platform_url` is set) checks the license key and platform reachability, then exits. For a non-default config path use `lk-exporter validate --config path`.
+
+**`validate`** is recommended before every new deployment. It confirms the scope parses correctly and the allowlist is non-empty, and, if platform ingest is configured, that the license key is valid and the endpoint is reachable and authenticated, without contacting any target hosts.
 
 ---
 

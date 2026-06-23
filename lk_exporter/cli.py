@@ -15,6 +15,12 @@ from lk_exporter import __version__
 
 console = Console()
 
+_VERSION_MESSAGE = (
+    f"lk-exporter v{__version__}\n"
+    "Licensed for use with the Lorikeet Security platform\n"
+    "https://lorikeetsecurity.com"
+)
+
 
 def _setup_logging(level: str) -> None:
     numeric = getattr(logging, level.upper(), logging.INFO)
@@ -25,8 +31,68 @@ def _setup_logging(level: str) -> None:
     )
 
 
+def _test_config_cb(ctx: click.Context, param: click.Parameter, value: bool) -> None:
+    if not value or ctx.resilient_parsing:
+        return
+    from lk_exporter.config import load
+    from lk_exporter.scope import ScopeEnforcer
+    from lk_exporter.transport import PlatformTransport
+
+    config_path = "config.yaml"
+    _setup_logging("info")
+    ok = True
+
+    try:
+        cfg = load(config_path)
+    except Exception as exc:
+        console.print(f"[red]✗[/red] Failed to load config: {exc}")
+        ctx.exit(1)
+        return
+
+    errors = cfg.validate()
+    if errors:
+        for e in errors:
+            console.print(f"[red]✗[/red] {e}")
+        ok = False
+    else:
+        console.print("[green]✓[/green] Config is valid")
+
+    scope = ScopeEnforcer(cfg.scope)
+    ip_count = len(scope.enumerate_ips())
+    console.print(f"[green]✓[/green] Scope: {len(cfg.scope)} entries, ~{ip_count} IPs enumerable")
+
+    if cfg.using_platform():
+        from lk_exporter.transport import LicenseError, TransportError
+        transport = PlatformTransport(
+            cfg.platform_url,  # type: ignore[arg-type]
+            cfg.license_key,   # type: ignore[arg-type]
+            cfg.agent_token,   # type: ignore[arg-type]
+            cfg.agent_id,
+        )
+        try:
+            transport.validate()
+            console.print(f"[green]✓[/green] License key validated against {cfg.platform_url}")
+        except LicenseError as exc:
+            console.print(f"[red]✗[/red] License error: {exc}")
+            ok = False
+        except TransportError as exc:
+            console.print(f"[red]✗[/red] Transport error: {exc}")
+            ok = False
+    else:
+        console.print("[dim]  No platform_url configured; standalone mode.[/dim]")
+
+    if ok:
+        console.print("\n[bold green]Config OK.[/bold green]")
+    else:
+        console.print("\n[bold red]Config invalid.[/bold red]")
+    ctx.exit(0 if ok else 1)
+
+
 @click.group()
-@click.version_option(__version__, prog_name="lk-exporter")
+@click.version_option(__version__, prog_name="lk-exporter", message=_VERSION_MESSAGE)
+@click.option("--test-config", is_flag=True, default=False, is_eager=True,
+              expose_value=False, callback=_test_config_cb,
+              help="Validate config.yaml and exit.")
 def main() -> None:
     """Lorikeet Security Agent Exporter - internal network reconnaissance and posture assessment."""
 
