@@ -149,30 +149,35 @@ Deploy only on networks you own or are **contractually engaged** to test. Unauth
 
 **Requirements:** Python 3.11+
 
-### From PyPI
-
-```bash
-pip install lorikeet-security-agent-exporter
-```
-
-### From source
+### Recommended: virtual environment (all platforms)
 
 ```bash
 git clone https://github.com/Lorikeet-Security/lorikeet-security-agent-exporter.git
 cd lorikeet-security-agent-exporter
 
 python -m venv .venv
-source .venv/bin/activate
-pip install . --break-system-packages
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -e .
 ```
 
-### From GitHub (latest main)
+Editable installs (`-e`) mean local code changes take effect immediately without reinstalling.
+
+### System-wide install
+
+Some Linux distributions (Arch, Debian 12+, Ubuntu 23.04+) enforce [PEP 668](https://peps.python.org/pep-0668/) and block system-wide pip installs by default. Pass `--break-system-packages` to override — a virtualenv is still preferable for production deployments.
 
 ```bash
-pip install git+https://github.com/Lorikeet-Security/lorikeet-security-agent-exporter.git
+# From PyPI
+pip install lorikeet-security-agent-exporter --break-system-packages
+
+# From source (after cloning)
+pip install -e . --break-system-packages
+
+# From GitHub (latest main)
+pip install git+https://github.com/Lorikeet-Security/lorikeet-security-agent-exporter.git --break-system-packages
 ```
 
-All three methods register the `lk-exporter` console entry point on your `PATH`.
+All methods register the `lk-exporter` console entry point on your `PATH`.
 
 ---
 
@@ -221,17 +226,20 @@ lk-exporter --version
 # quick config check (validates config.yaml and exits)
 lk-exporter --test-config
 
+# continuous agentic operation (quiet by default)
+lk-exporter run
+
 # one-shot collection cycle
 lk-exporter run --once
-
-# continuous agentic operation
-lk-exporter run
 
 # point at a specific config file
 lk-exporter run --config /etc/lorikeet/config.yaml
 
-# also start the MCP stdio server alongside the agent
-lk-exporter run --mcp
+# verbose output — full INFO logs and per-cycle findings table
+lk-exporter run --verbose
+
+# also start the MCP stdio server alongside the agent (for Lory AI integration)
+lk-exporter run --agent-mode
 
 # full validation of config, scope, and platform reachability
 lk-exporter validate
@@ -240,6 +248,8 @@ lk-exporter validate --config /etc/lorikeet/config.yaml
 # start MCP stdio server only (no collection)
 lk-exporter mcp
 ```
+
+By default the agent runs quietly: after startup it prints a single status line and then a one-line summary per collection cycle (finding count with critical/high breakdown). Pass `--verbose` / `-v` to see full INFO logs and the per-cycle findings table.
 
 The CLI is also available as a module if the console script is not on your `PATH`:
 
