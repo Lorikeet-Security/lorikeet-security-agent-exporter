@@ -27,6 +27,7 @@ modules:
   - patch
   - inventory
   - posture
+  - supply_chain    # filesystem npm crawl + OSV vuln lookup + malicious package detection
 
 # Max parallel host operations per cycle. Tune for network sensitivity.
 concurrency: 16

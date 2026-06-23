@@ -14,7 +14,7 @@ from typing import Any, Literal
 
 Severity = Literal["critical", "high", "medium", "low", "info"]
 State = Literal["open", "closed", "suppressed"]
-Module = Literal["discovery", "patch", "inventory", "posture"]
+Module = Literal["discovery", "patch", "inventory", "posture", "supply_chain"]
 
 
 def _now_iso() -> str:
