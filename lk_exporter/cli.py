@@ -17,8 +17,7 @@ console = Console()
 
 _VERSION_MESSAGE = (
     f"lk-exporter v{__version__}\n"
-    "Licensed for use with the Lorikeet Security platform\n"
-    "https://lorikeetsecurity.com"
+    "Licensed for use with the Lorikeet Security platform"
 )
 
 
@@ -100,14 +99,10 @@ def main() -> None:
     Runs collectors against authorized scope, fingerprints findings over time,
     and ships results to the Lorikeet Security platform or stdout.
 
-    \b
-    Common usage:
-      lk-exporter validate              check config, scope, and platform creds
-      lk-exporter run --once            one collection cycle (cron / systemd)
-      lk-exporter run                   continuous mode, every <interval>
-      lk-exporter run -v                verbose: full logs + per-cycle table
-      lk-exporter mcp                   MCP server only (Claude Desktop / Lory)
-      lk-exporter run --agent-mode      collection + MCP server on stdio
+    Start with `lk-exporter validate` to verify config and platform credentials.
+    Use `run` for continuous collection, `run --once` for cron/systemd, and
+    `run -v` for verbose output. `mcp` starts the MCP server only (for Claude
+    Desktop or Lory); `run --agent-mode` runs collection and MCP together.
     """
 
 
