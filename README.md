@@ -10,6 +10,8 @@
 
 The Lorikeet Security Agent Exporter is a lightweight, self-directed collection agent that runs on the inside of a network. Once authorized and scoped, it performs continuous discovery and assessment without requiring an operator to drive each scan. Results are normalized into a consistent finding schema and shipped over an authenticated, outbound-only channel to the Lorikeet Security platform, where they feed into PTaaS workflows, dashboards, and reporting.
 
+It also acts as the internal network toolbelt for **Lory AI**: when connected via MCP, Lory can drive live pentests through the agent — scanning hosts, grabbing banners, probing web endpoints, running nmap scripts, and resolving DNS — all gated by the same scope enforcer that governs automated collection.
+
 Think of it as the internal-network analogue to external attack-surface management: persistent, prioritized, and built to surface what changed and what is newly exploitable, not just what existed at scan time.
 
 ---
@@ -24,13 +26,14 @@ The agentic model changes the loop:
 - **Self-prioritizing.** Rather than re-running an identical scan list, the agent decides what to look at next based on what it has already found: new hosts, changed services, high-severity exposures.
 - **Low-touch deployment.** A single agent inside the perimeter replaces ad-hoc tooling and manual data collection.
 - **Platform-native.** Findings land directly in the Lorikeet Security platform in a structured form, ready for correlation against external ASM data and prior engagement history.
+- **AI-driven pentesting.** Lory AI connects to the agent over MCP and conducts live internal pentests — port scans, service fingerprinting, web probing, and more — with the agent enforcing scope on every call.
 
 ---
 
 ## Capabilities
 
 ### Host & service discovery
-Sweeps authorized internal ranges, fingerprints live hosts, identifies open ports, and classifies exposed services. Tracks newly appeared and newly disappeared hosts between collection cycles. Bundled supply chain analysis (npm + OSV + malicious-package detection) runs automatically alongside discovery.
+Sweeps authorized internal ranges, fingerprints live hosts, identifies open ports, and classifies exposed services. Tracks newly appeared and newly disappeared hosts between collection cycles. Supply chain analysis is part of the discovery module: it crawls the filesystem for npm manifests, queries the OSV vulnerability database for every discovered package, and cross-references against known-malicious packages — no separate configuration required.
 
 ### Patch & vulnerability state
 Collects OS patch levels and installed-package manifests, then maps them against known-CVE data to flag missing patches, end-of-life software, and known-exploitable versions. Prioritizes by severity and exploitability rather than raw CVE count.
@@ -47,8 +50,11 @@ Findings are fingerprinted (asset + check type + key detail) and tracked across 
 ### Structured findings export
 Normalizes all collected data into a single finding schema and streams it to the platform over an authenticated channel for triage, deduplication, and reporting. Standalone mode (no platform URL) prints findings as JSON to stdout for piping to a SIEM or custom sink.
 
+### Lory AI pentesting
+When running in agent mode, the exporter exposes an MCP server that Lory AI uses to conduct live internal network pentests. Lory can call `scan_host`, `discover_hosts`, `grab_banner`, `check_web_endpoint`, `run_nmap_script`, and `dns_lookup` to drive real reconnaissance and security checks against scoped targets — the same scope gate applies to every tool call. Results feed directly into Lory's reasoning loop, enabling AI-guided pentesting inside the perimeter without manual operator involvement between steps.
+
 ### Agentic operation
-Runs unattended. Schedules its own collection cycles, sequences modules, and adapts its focus to the current state of the environment. Exposes an MCP server for on-demand tool calls from AI systems including Lory and Claude Desktop.
+Runs unattended. Schedules its own collection cycles, sequences modules, and adapts its focus to the current state of the environment. The MCP server is also available to Claude Desktop and any other MCP-compatible client for on-demand interaction.
 
 ---
 
@@ -103,7 +109,7 @@ flowchart TB
 
 | Module         | Collects                                                                 | Notes |
 | -------------- | ------------------------------------------------------------------------ | ----- |
-| `discovery`    | Live hosts, open ports, service fingerprints, host churn; npm packages + OSV CVE lookup + malicious-package detection (supply chain) | Baseline module; recommended always-on. Supply chain runs automatically within this module. |
+| `discovery`    | Live hosts, open ports, service fingerprints, host churn — **and** npm manifest crawl, OSV CVE lookup, malicious-package detection | Baseline module; recommended always-on. Supply chain analysis is built into this module and runs automatically with no extra config. |
 | `patch`        | OS patch level, installed-package manifest, CVE mapping, EOL software    | Severity- and exploitability-prioritized |
 | `inventory`    | OS/version, installed software, running services, config drift           | Tracks change over time |
 | `posture`      | Patch-compliance rollup across the fleet, known-exploited flags          | Built on `patch` + `inventory` output; always runs last |
@@ -114,7 +120,9 @@ Modules are selected in configuration via the `modules` setting. Disabled module
 
 ## MCP tools
 
-When the agent runs in MCP mode (`lk-exporter mcp` or `lk-exporter run --agent-mode`), it exposes the following tools to any MCP client:
+When the agent runs in agent mode (`lk-exporter run --agent-mode`) or MCP-only mode (`lk-exporter mcp`), it exposes 14 tools over a stdio JSON-RPC channel. Lory AI uses the pentest tools to conduct live internal network assessments; Claude Desktop and any other MCP-compatible client can use the full tool set for on-demand interaction.
+
+Every tool that contacts a host enforces scope before sending any traffic. Out-of-scope targets are rejected immediately.
 
 | Tool | Category | Description |
 | ---- | -------- | ----------- |
@@ -124,16 +132,14 @@ When the agent runs in MCP mode (`lk-exporter mcp` or `lk-exporter run --agent-m
 | `get_status` | Query | Agent health, scope summary, modules, last cycle time, and severity breakdown |
 | `validate_scope` | Scope | Check whether a host, IP, or CIDR is inside the configured allowlist |
 | `list_scope` | Scope | List all scope entries and estimated IP count |
-| `scan_host` | Pentest | Port + service scan via nmap (or pure-Python TCP fallback) |
-| `discover_hosts` | Pentest | Live host discovery across all scope ranges via nmap ping sweep |
-| `grab_banner` | Pentest | Capture a TCP service banner; TLS-aware |
-| `check_web_endpoint` | Pentest | HTTP/S GET probe — status code, security headers, body snippet |
-| `run_nmap_script` | Pentest | Run a named NSE script; exploit/brute/dos categories are blocked |
-| `dns_lookup` | Pentest | Forward A-record resolution + reverse PTR lookup |
+| `scan_host` | Pentest | Port + service scan via nmap (or pure-Python TCP fallback); used by Lory |
+| `discover_hosts` | Pentest | Live host discovery across all scope ranges via nmap ping sweep; used by Lory |
+| `grab_banner` | Pentest | Capture a TCP service banner; TLS-aware; used by Lory |
+| `check_web_endpoint` | Pentest | HTTP/S GET probe — status code, security headers, body snippet; used by Lory |
+| `run_nmap_script` | Pentest | Run a named NSE script (safe/discovery/auth categories only); used by Lory |
+| `dns_lookup` | Pentest | Forward A-record resolution + reverse PTR lookup; used by Lory |
 | `list_peers` | Mesh | Health and status of all configured peer agents |
 | `get_peer_findings` | Mesh | Pull findings and discovered hosts from one or all peer agents |
-
-All pentest tools validate scope before making any network call. Out-of-scope targets are rejected and no traffic is sent.
 
 ---
 
