@@ -93,10 +93,18 @@ class PlatformTransport:
                 log.error("Failed to send batch %d: %s", i // _BATCH_SIZE, exc)
                 continue
 
-            if resp.status_code in (200, 201, 202):
-                accepted = resp.json().get("accepted", len(batch))
+            if resp.status_code in (200, 201, 202, 207):
+                data = resp.json()
+                accepted = data.get("accepted", len(batch))
+                skipped  = data.get("skipped", 0)
                 total_accepted += accepted
-                log.debug("Batch %d: %d/%d accepted", i // _BATCH_SIZE, accepted, len(batch))
+                if skipped:
+                    log.info(
+                        "Batch %d: %d accepted, %d already known",
+                        i // _BATCH_SIZE, accepted, skipped,
+                    )
+                else:
+                    log.debug("Batch %d: %d/%d accepted", i // _BATCH_SIZE, accepted, len(batch))
             else:
                 log.error(
                     "Batch %d rejected: HTTP %d %s",
