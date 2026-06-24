@@ -56,53 +56,38 @@ Runs unattended. Schedules its own collection cycles, sequences modules, and ada
 
 ```mermaid
 flowchart TB
-    subgraph NET["CLIENT INTERNAL NETWORK"]
-        subgraph AGENT["Exporter Agent (single host)"]
-            SCHED["Scheduler<br/>(agentic loop)"]
-            SCOPE["Scope Enforcer<br/>(allowlist gate)"]
-            SCHED --> SCOPE
+    subgraph AGENT["EXPORTER AGENT  ·  CLIENT INTERNAL NETWORK"]
+        SCHED["Scheduler\n(agentic loop)"]
+        SCOPE["Scope Enforcer\n(allowlist gate)"]
+        DISC["Discovery\n+ Supply Chain"]
+        PATCH["Patch / Vuln"]
+        INV["Inventory"]
+        POSTURE["Posture"]
+        NORM["Normalizer\n(finding schema)"]
+        SS["State Store\n(fingerprint · auto-close)"]
 
-            DISC["Discovery<br/>↳ Supply Chain (npm+OSV)"]
-            PATCH["Patch / Vuln<br/>Collector"]
-            INV["Inventory<br/>Collector"]
-            POSTURE["Posture<br/>Collector"]
-
-            SCOPE --> DISC
-            SCOPE --> PATCH
-            SCOPE --> INV
-            SCOPE --> POSTURE
-
-            NORM["Normalizer<br/>(finding schema)"]
-            DISC --> NORM
-            PATCH --> NORM
-            INV --> NORM
-            POSTURE --> NORM
-
-            SS["State Store<br/>(fingerprint · auto-close)"]
-            NORM --> SS
-
-            WH["Webhooks<br/>(HMAC-signed)"]
-            SS --> WH
-
-            MCP["MCP Server<br/>(stdio · JSON-RPC)"]
-            RELAY["Lory Relay<br/>(platform poll)"]
-            COORD["Coordinator API<br/>(peer HTTP)"]
-        end
-
-        subgraph PEERS["OTHER SEGMENTS"]
-            PA["Peer Agent(s)"]
-        end
+        SCHED --> SCOPE
+        SCOPE --> DISC
+        SCOPE --> PATCH
+        SCOPE --> INV
+        SCOPE --> POSTURE
+        DISC --> NORM
+        PATCH --> NORM
+        INV --> NORM
+        POSTURE --> NORM
+        NORM --> SS
     end
 
-    PLATFORM["Lorikeet Security Platform / PTaaS<br/>triage . correlation . reporting"]
-    AITOOL["AI Client<br/>(Lory / Claude Desktop)"]
-    WHURL["Webhook Targets<br/>(SIEM, alerting)"]
+    PLATFORM["Lorikeet Security Platform\ntriage · correlation · reporting"]
+    AI["AI Client\nLory · Claude Desktop"]
+    WH["Webhook Targets\nSIEM · alerting"]
+    PEERS["Peer Agents\nother segments"]
 
-    SS -->|"outbound-only, authenticated"| PLATFORM
-    RELAY <-->|"tool-queue poll + results"| PLATFORM
-    MCP <-->|"JSON-RPC stdio"| AITOOL
-    WH --> WHURL
-    COORD <-->|"peer pull"| PA
+    SS -->|"findings · outbound TLS"| PLATFORM
+    SS -->|"alerts · HMAC-signed"| WH
+    AGENT <-->|"MCP stdio"| AI
+    AGENT <-->|"Lory relay"| PLATFORM
+    AGENT <-->|"peer pull"| PEERS
 ```
 
 **Design principles**
