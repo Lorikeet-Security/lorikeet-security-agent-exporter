@@ -9,9 +9,9 @@
 
 ## Overview
 
-The Lorikeet Security Agent Exporter is a lightweight, self-directed collection agent that runs on a host inside a client network. Focused on the machine it is deployed on, it continuously assesses local patch state, installed software, running services, open ports, and supply chain exposure — without requiring an operator to drive each cycle. Results are normalized into a consistent finding schema and shipped over an authenticated, outbound-only channel to the Lorikeet Security platform, where they feed into PTaaS workflows, dashboards, and reporting.
+The Lorikeet Security Agent Exporter is a lightweight, self-directed collection agent that runs on a host inside a client network. Focused on the machine it is deployed on, it continuously assesses local patch state, installed software, running services, open ports, and supply chain exposure - without requiring an operator to drive each cycle. Results are normalized into a consistent finding schema and shipped over an authenticated, outbound-only channel to the Lorikeet Security platform, where they feed into PTaaS workflows, dashboards, and reporting.
 
-Lory AI connects to the agent over MCP to trigger collection cycles and pull findings. Lory's own pentest toolbelt handles broader network-level reconnaissance independently — the exporter's job is to know everything about the host it runs on and report it reliably.
+Lory AI connects to the agent over MCP to trigger collection cycles and pull findings. Lory's own pentest toolbelt handles broader network-level reconnaissance independently - the exporter's job is to know everything about the host it runs on and report it reliably.
 
 Think of it as a per-host posture sensor: persistent, lightweight, and built to surface what changed on this machine and what is newly exploitable, not just what existed at install time.
 
@@ -20,7 +20,7 @@ Think of it as a per-host posture sensor: persistent, lightweight, and built to 
 ## What's new in 0.2.0a1
 
 - **Phase 4 complete.** All orchestration features are now shipped: on-demand MCP collection, multi-agent mesh coordination, remediation-tracking auto-close, and HMAC-signed alerting webhooks.
-- **MCP relay refactor.** Pentest tools (port scanning, banner grabbing, web probing) have been removed from the exporter. Lory AI brings its own toolbelt and connects to the exporter solely for host posture data — cleaner separation of concerns, smaller attack surface on the deployed agent.
+- **MCP relay refactor.** Pentest tools (port scanning, banner grabbing, web probing) have been removed from the exporter. Lory AI brings its own toolbelt and connects to the exporter solely for host posture data - cleaner separation of concerns, smaller attack surface on the deployed agent.
 - **`--agent-mode` stabilised.** The combined continuous-collection + MCP stdio mode is now the recommended way to run when Lory is the primary orchestrator.
 
 ---
@@ -35,14 +35,14 @@ The agentic model changes the loop:
 - **Host-focused.** Each agent knows its own host deeply: installed packages, patch levels, running services, open ports, supply chain exposure. Network-wide recon is Lory's job.
 - **Low-touch deployment.** Deploy one agent per host; they run unattended and report without operator involvement between cycles.
 - **Platform-native.** Findings land directly in the Lorikeet Security platform in a structured form, ready for correlation against external ASM data and prior engagement history.
-- **AI-ready.** Lory AI connects via MCP to trigger cycles, pull findings, and coordinate across agents — then applies its own pentest toolbelt for network-level investigation.
+- **AI-ready.** Lory AI connects via MCP to trigger cycles, pull findings, and coordinate across agents - then applies its own pentest toolbelt for network-level investigation.
 
 ---
 
 ## Capabilities
 
 ### Host & service discovery
-Fingerprints the local host: open ports, listening services, and service versions. Tracks newly exposed and newly closed ports between cycles so changes are surfaced immediately. Supply chain analysis is part of the discovery module: it crawls the local filesystem for npm manifests, queries the OSV vulnerability database for every discovered package, and cross-references against known-malicious packages — no separate configuration required.
+Fingerprints the local host: open ports, listening services, and service versions. Tracks newly exposed and newly closed ports between cycles so changes are surfaced immediately. Supply chain analysis is part of the discovery module: it crawls the local filesystem for npm manifests, queries the OSV vulnerability database for every discovered package, and cross-references against known-malicious packages - no separate configuration required.
 
 ### Patch & vulnerability state
 Collects OS patch levels and installed-package manifests, then maps them against known-CVE data to flag missing patches, end-of-life software, and known-exploitable versions. Prioritizes by severity and exploitability rather than raw CVE count.
@@ -60,7 +60,7 @@ Findings are fingerprinted (asset + check type + key detail) and tracked across 
 Normalizes all collected data into a single finding schema and streams it to the platform over an authenticated channel for triage, deduplication, and reporting. Standalone mode (no platform URL) prints findings as JSON to stdout for piping to a SIEM or custom sink.
 
 ### Lory AI integration
-Exposes an MCP server so Lory AI can trigger collection cycles, retrieve findings, and query agent state on demand. Lory uses this to feed fresh posture data into its reasoning loop during an engagement — for example, triggering a patch scan on a host of interest and immediately pulling the results. Network-level pentesting (port scanning, banner grabbing, web probing) is handled by Lory's own toolbelt, not the exporter.
+Exposes an MCP server so Lory AI can trigger collection cycles, retrieve findings, and query agent state on demand. Lory uses this to feed fresh posture data into its reasoning loop during an engagement - for example, triggering a patch scan on a host of interest and immediately pulling the results. Network-level pentesting (port scanning, banner grabbing, web probing) is handled by Lory's own toolbelt, not the exporter.
 
 ### Agentic operation
 Runs unattended. Schedules its own collection cycles, sequences modules, and persists finding state across restarts. The MCP server is available to Claude Desktop and any other MCP-compatible client for on-demand interaction alongside continuous collection.
@@ -117,7 +117,7 @@ flowchart TB
 
 | Module         | Collects                                                                 | Notes |
 | -------------- | ------------------------------------------------------------------------ | ----- |
-| `discovery`    | Local open ports, listening services, service versions, port churn — **and** local npm manifest crawl, OSV CVE lookup, malicious-package detection | Baseline module; recommended always-on. Supply chain analysis is built into this module and runs automatically with no extra config. |
+| `discovery`    | Local open ports, listening services, service versions, port churn - **and** local npm manifest crawl, OSV CVE lookup, malicious-package detection | Baseline module; recommended always-on. Supply chain analysis is built into this module and runs automatically with no extra config. |
 | `patch`        | OS patch level, installed-package manifest, CVE mapping, EOL software    | Severity- and exploitability-prioritized |
 | `inventory`    | OS/version, installed software, running services, config drift           | Tracks change over time |
 | `posture`      | Patch-compliance rollup across the fleet, known-exploited flags          | Built on `patch` + `inventory` output; always runs last |
@@ -132,7 +132,7 @@ When the agent runs in agent mode (`lk-exporter run --agent-mode`) or MCP-only m
 
 | Tool | Category | Description |
 | ---- | -------- | ----------- |
-| `trigger_collection` | Control | Run an on-demand cycle — all enabled modules or a named subset |
+| `trigger_collection` | Control | Run an on-demand cycle - all enabled modules or a named subset |
 | `get_findings` | Query | Return findings from the most recent cycle; filter by severity or module |
 | `get_closed_findings` | Query | Return findings auto-closed by the remediation-tracking loop |
 | `get_status` | Query | Agent health, scope summary, modules, last cycle time, and severity breakdown |
@@ -203,9 +203,28 @@ pip install -e .
 
 Editable installs (`-e`) mean local code changes take effect immediately without reinstalling.
 
-### System-wide install
+> **On Debian 12+ / Ubuntu 23.04+:** The virtual environment method is the only reliable install path. These distributions enforce [PEP 668](https://peps.python.org/pep-0668/) and additionally ship certain packages (e.g. `typing_extensions`) without a pip `RECORD` file. This means `--break-system-packages` cannot upgrade those packages even when the flag is passed, causing the install to abort. A venv sidesteps this entirely — pip manages its own isolated copy of every dependency.
 
-Some Linux distributions (Arch, Debian 12+, Ubuntu 23.04+) enforce [PEP 668](https://peps.python.org/pep-0668/) and block system-wide pip installs by default. Pass `--break-system-packages` to override — a virtualenv is still preferable for production deployments.
+### If cloning from GitHub is not possible (air-gapped / restricted hosts)
+
+Copy the repository to the host by other means (scp, USB, shared volume, etc.), then install from the local directory:
+
+```bash
+cd lorikeet-security-agent-exporter
+python -m venv .venv
+source .venv/bin/activate
+pip install -e .
+```
+
+The `lk-exporter` command is then available inside the activated venv. To run it without activating each time, call the venv binary directly:
+
+```bash
+/path/to/lorikeet-security-agent-exporter/.venv/bin/lk-exporter run
+```
+
+### System-wide install (not recommended on managed systems)
+
+Some Linux distributions (Arch, Debian 12+, Ubuntu 23.04+) enforce [PEP 668](https://peps.python.org/pep-0668/) and block system-wide pip installs by default. Even with `--break-system-packages`, installs may fail on Debian-family systems when a dependency (e.g. `typing_extensions`) was installed by the OS package manager without a pip RECORD file. Use the venv path above instead.
 
 ```bash
 # From PyPI
@@ -230,13 +249,13 @@ Configuration is supplied via a YAML config file (default `config.yaml`) or envi
 
 | Setting        | Required | Env var | Description |
 | -------------- | -------- | ------- | ----------- |
-| `scope`        | yes      | —       | CIDR ranges / hostnames the agent is authorized to touch |
-| `agent_id`     | no       | —       | Stable identity string. Auto-generated on first run and persisted to `.lk_state/agent.json`; pin here to survive reinstalls |
+| `scope`        | yes      | -       | CIDR ranges / hostnames the agent is authorized to touch |
+| `agent_id`     | no       | -       | Stable identity string. Auto-generated on first run and persisted to `.lk_state/agent.json`; pin here to survive reinstalls |
 | `platform_url` | no       | `LK_PLATFORM_URL` | Lorikeet Security platform ingest endpoint (omit for standalone / self-hosted sink) |
 | `license_key`  | if platform | `LK_LICENSE_KEY` | Platform license key. Required for platform ingest |
 | `agent_token`  | if platform | `LK_AGENT_TOKEN` | Per-deployment agent authentication token |
 | `interval`     | no       | `LK_INTERVAL` | Collection cadence: `continuous`, or e.g. `6h`, `24h`, `30m` |
-| `modules`      | no       | —       | Enabled collectors: `discovery`, `patch`, `inventory`, `posture` |
+| `modules`      | no       | -       | Enabled collectors: `discovery`, `patch`, `inventory`, `posture` |
 | `concurrency`  | no       | `LK_CONCURRENCY` | Max parallel host operations per cycle (default: `16`) |
 | `log_level`    | no       | `LK_LOG_LEVEL` | `info` (default), `debug`, `warn`, `error` |
 
@@ -246,7 +265,7 @@ Configuration is supplied via a YAML config file (default `config.yaml`) or envi
 | ------- | -------- | ------- | ----------- |
 | `coordinator_port` | no | `LK_COORDINATOR_PORT` | Start a peer coordinator HTTP API on this port; disabled by default |
 | `peer_secret` | no | `LK_PEER_SECRET` | Shared Bearer token for peer-to-peer authentication |
-| `peers` | no | — | List of peer coordinator URLs to pull findings and hosts from each cycle |
+| `peers` | no | - | List of peer coordinator URLs to pull findings and hosts from each cycle |
 
 ### Remediation tracking
 
@@ -317,7 +336,7 @@ lk-exporter run --once
 # point at a specific config file
 lk-exporter run --config /etc/lorikeet/config.yaml
 
-# verbose output — full INFO logs and per-cycle findings table
+# verbose output - full INFO logs and per-cycle findings table
 lk-exporter run --verbose
 
 # start the agent + MCP stdio server simultaneously (for Lory / Claude Desktop)
@@ -373,7 +392,7 @@ A single agent can only reach one network segment. When multiple agents are depl
 5. A shared `peer_secret` authenticates peer-to-peer traffic.
 
 ```yaml
-# Agent on the internal LAN — runs coordinator and knows about the DMZ agent
+# Agent on the internal LAN - runs coordinator and knows about the DMZ agent
 coordinator_port: 8765
 peer_secret: ${LK_PEER_SECRET}
 peers:
@@ -534,7 +553,7 @@ Credentialed deep inventory, authenticated config-audit collectors (CIS-style), 
 Supply chain: npm package discovery + OSV CVE lookup + malicious-package detection *(shipped)*. Remaining: Active-Directory-aware discovery, pluggable CVE / threat-intel feeds, KEV and EPSS prioritization, cloud and hybrid asset discovery, container / Kubernetes collectors.
 
 **Phase 4 - Orchestration & automation** `shipped · 0.2.0a1`
-On-demand collection over MCP *(shipped)*, Lory AI integration via MCP stdio — `trigger_collection`, `get_findings`, `get_status` *(shipped)*, multi-agent coordination — per-agent coordinator HTTP server + peer pull client, `list_peers` / `get_peer_findings` MCP tools *(shipped)*, remediation-tracking auto-close loop — finding fingerprinting, grace-cycle counter, synthetic close notifications *(shipped)*, alerting webhooks — HMAC-signed HTTP POST on high-severity findings and close events, configurable per-target threshold *(shipped)*, MCP relay refactor — pentest tools removed from the exporter; Lory brings its own toolbelt and connects to the exporter for host posture data only *(shipped)*.
+On-demand collection over MCP *(shipped)*, Lory AI integration via MCP stdio - `trigger_collection`, `get_findings`, `get_status` *(shipped)*, multi-agent coordination - per-agent coordinator HTTP server + peer pull client, `list_peers` / `get_peer_findings` MCP tools *(shipped)*, remediation-tracking auto-close loop - finding fingerprinting, grace-cycle counter, synthetic close notifications *(shipped)*, alerting webhooks - HMAC-signed HTTP POST on high-severity findings and close events, configurable per-target threshold *(shipped)*, MCP relay refactor - pentest tools removed from the exporter; Lory brings its own toolbelt and connects to the exporter for host posture data only *(shipped)*.
 
 **Phase 5 - Intelligence** `planned`
 Risk-based prioritization (exploitability x exposure x criticality), attack-path mapping, drift baselining with anomaly detection, optional safe-validation of select findings.
