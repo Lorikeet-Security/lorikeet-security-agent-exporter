@@ -306,7 +306,7 @@ def run(once: bool, config_path: str, with_mcp: bool, verbose: bool) -> None:
 
     _peers_line = f"{len(cfg.peers)} peer(s)" if cfg.peers else "none"
     if cfg.coordinator_port:
-        _peers_line += f"  ·  coordinator on :{cfg.coordinator_port}"
+        _peers_line += f"  ·  coordinator on :{cfg.coordinator_port} (TLS)"
     _webhooks_line = f"{len(cfg.webhooks)} target(s)" if cfg.webhooks else "none"
     _autoclose_line = f"enabled (grace: {cfg.auto_close_grace_cycles} cycles)" if cfg.auto_close_enabled else "disabled"
 
@@ -386,19 +386,30 @@ def run(once: bool, config_path: str, with_mcp: bool, verbose: bool) -> None:
     peer_client = None
     if cfg.peers:
         from lk_exporter.coordinator import PeerClient
-        peer_client = PeerClient(cfg.peers, peer_secret=cfg.peer_secret)
-        log.info("Peer client: %d peer(s)", len(cfg.peers))
+        peer_client = PeerClient(
+            cfg.peers,
+            peer_secret=cfg.peer_secret,
+            tls_verify=cfg.peer_tls_verify,
+        )
+        log.info("Peer client: %d peer(s) (tls_verify=%s)", len(cfg.peers), cfg.peer_tls_verify)
 
     # -- Coordinator server --
     if cfg.coordinator_port:
-        import threading as _threading
+        from pathlib import Path as _Path
         from lk_exporter.coordinator import CoordinatorServer, update_state
+        from lk_exporter.config import STATE_DIR
         update_state(cfg.agent_id, cfg.peer_secret, [], [], 0)
-        coord_server = CoordinatorServer(cfg.coordinator_port)
+        coord_server = CoordinatorServer(
+            cfg.coordinator_port,
+            state_dir=_Path(STATE_DIR),
+            cert_path=_Path(cfg.coordinator_tls_cert) if cfg.coordinator_tls_cert else None,
+            key_path=_Path(cfg.coordinator_tls_key)  if cfg.coordinator_tls_key  else None,
+        )
         coord_server.start()
         if not verbose:
             console.print(
-                f"[green]●[/green]  Coordinator API on :[cyan]{cfg.coordinator_port}[/cyan]"
+                f"[green]●[/green]  Coordinator API (TLS) on :[cyan]{cfg.coordinator_port}[/cyan]"
+                f"  ·  fp:[dim]{coord_server.tls_fingerprint[:16]}…[/dim]"
                 + (f"  ·  [dim]{len(cfg.peers)} peer(s)[/dim]" if cfg.peers else "")
             )
 

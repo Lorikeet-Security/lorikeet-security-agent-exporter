@@ -27,6 +27,8 @@ _ENV_VARS = {
     "concurrency": "LK_CONCURRENCY",
     "coordinator_port": "LK_COORDINATOR_PORT",
     "peer_secret": "LK_PEER_SECRET",
+    "coordinator_tls_cert": "LK_COORDINATOR_TLS_CERT",
+    "coordinator_tls_key": "LK_COORDINATOR_TLS_KEY",
 }
 
 _INTERVAL_RE = re.compile(r"^(\d+)(s|m|h|d)$")
@@ -60,6 +62,12 @@ class Config:
     peers: list[str] = field(default_factory=list)
     coordinator_port: int | None = None
     peer_secret: str | None = None
+    # TLS: auto-generated self-signed cert by default; provide paths to use your own
+    coordinator_tls_cert: str | None = None
+    coordinator_tls_key: str | None = None
+    # Whether peer clients verify the remote TLS cert against a trusted CA.
+    # Leave False (default) when using self-signed certs — auth is via peer_secret.
+    peer_tls_verify: bool = False
 
     # Auto-close loop
     auto_close_enabled: bool = True
@@ -215,6 +223,9 @@ def load(config_path: str | Path = "config.yaml") -> Config:
         peers=peers,
         coordinator_port=coordinator_port,
         peer_secret=get("peer_secret") or None,
+        coordinator_tls_cert=get("coordinator_tls_cert") or None,
+        coordinator_tls_key=get("coordinator_tls_key") or None,
+        peer_tls_verify=bool(raw.get("peer_tls_verify", False)),
         auto_close_enabled=bool(raw.get("auto_close_enabled", True)),
         auto_close_grace_cycles=int(raw.get("auto_close_grace_cycles", 2)),
         webhooks=webhooks,
