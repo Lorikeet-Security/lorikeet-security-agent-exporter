@@ -1,7 +1,8 @@
 # lorikeet-security-agent-exporter
 
+![Version](https://img.shields.io/badge/version-0.2.0a1-blueviolet)
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue)
-![Status](https://img.shields.io/badge/status-early%20development-orange)
+![Status](https://img.shields.io/badge/status-alpha-orange)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ---
@@ -13,6 +14,14 @@ The Lorikeet Security Agent Exporter is a lightweight, self-directed collection 
 Lory AI connects to the agent over MCP to trigger collection cycles and pull findings. Lory's own pentest toolbelt handles broader network-level reconnaissance independently — the exporter's job is to know everything about the host it runs on and report it reliably.
 
 Think of it as a per-host posture sensor: persistent, lightweight, and built to surface what changed on this machine and what is newly exploitable, not just what existed at install time.
+
+---
+
+## What's new in 0.2.0a1
+
+- **Phase 4 complete.** All orchestration features are now shipped: on-demand MCP collection, multi-agent mesh coordination, remediation-tracking auto-close, and HMAC-signed alerting webhooks.
+- **MCP relay refactor.** Pentest tools (port scanning, banner grabbing, web probing) have been removed from the exporter. Lory AI brings its own toolbelt and connects to the exporter solely for host posture data — cleaner separation of concerns, smaller attack surface on the deployed agent.
+- **`--agent-mode` stabilised.** The combined continuous-collection + MCP stdio mode is now the recommended way to run when Lory is the primary orchestrator.
 
 ---
 
@@ -511,7 +520,7 @@ Earlier phases harden the core collection loop; later phases deepen accuracy, br
 Phase 1  ####################  100%   Core hardening        (shipped)
 Phase 2  ####................   ~20%  Accuracy & depth
 Phase 3  ###.................   ~15%  Coverage expansion    (supply chain shipped)
-Phase 4  ##################..   ~90%  Orchestration         (shipped)
+Phase 4  ####################  100%  Orchestration         (shipped in 0.2.0a1)
 Phase 5  ....................     0%  Intelligence
 ```
 
@@ -524,8 +533,8 @@ Credentialed deep inventory, authenticated config-audit collectors (CIS-style), 
 **Phase 3 - Coverage expansion** `in progress`
 Supply chain: npm package discovery + OSV CVE lookup + malicious-package detection *(shipped)*. Remaining: Active-Directory-aware discovery, pluggable CVE / threat-intel feeds, KEV and EPSS prioritization, cloud and hybrid asset discovery, container / Kubernetes collectors.
 
-**Phase 4 - Orchestration & automation** `shipped`
-On-demand collection over MCP *(shipped)*, Lory AI integration via MCP stdio — `trigger_collection`, `get_findings`, `get_status` *(shipped)*, multi-agent coordination — per-agent coordinator HTTP server + peer pull client, `list_peers` / `get_peer_findings` MCP tools *(shipped)*, remediation-tracking auto-close loop — finding fingerprinting, grace-cycle counter, synthetic close notifications *(shipped)*, alerting webhooks — HMAC-signed HTTP POST on high-severity findings and close events, configurable per-target threshold *(shipped)*. Remaining: agent-to-agent task delegation across segments.
+**Phase 4 - Orchestration & automation** `shipped · 0.2.0a1`
+On-demand collection over MCP *(shipped)*, Lory AI integration via MCP stdio — `trigger_collection`, `get_findings`, `get_status` *(shipped)*, multi-agent coordination — per-agent coordinator HTTP server + peer pull client, `list_peers` / `get_peer_findings` MCP tools *(shipped)*, remediation-tracking auto-close loop — finding fingerprinting, grace-cycle counter, synthetic close notifications *(shipped)*, alerting webhooks — HMAC-signed HTTP POST on high-severity findings and close events, configurable per-target threshold *(shipped)*, MCP relay refactor — pentest tools removed from the exporter; Lory brings its own toolbelt and connects to the exporter for host posture data only *(shipped)*.
 
 **Phase 5 - Intelligence** `planned`
 Risk-based prioritization (exploitability x exposure x criticality), attack-path mapping, drift baselining with anomaly detection, optional safe-validation of select findings.

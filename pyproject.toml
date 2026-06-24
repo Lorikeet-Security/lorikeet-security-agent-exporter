@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lorikeet-security-agent-exporter"
-version = "0.1.0"
+version = "0.2.0a1"
 description = "Agentic internal-network exporter for the Lorikeet Security platform"
 readme = "README.md"
 license = { text = "MIT" }
