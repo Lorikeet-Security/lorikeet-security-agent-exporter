@@ -96,13 +96,85 @@ def _test_config_cb(ctx: click.Context, param: click.Parameter, value: bool) -> 
 def main() -> None:
     """Internal-network reconnaissance and continuous security posture assessment.
 
-    Runs collectors against authorized scope, fingerprints findings over time,
-    and ships results to the Lorikeet Security platform or stdout.
+    lk-exporter is the on-premises agent for the Lorikeet Security platform. It
+    runs security collectors (port scanners, TLS checkers, CVE matchers, DNS
+    auditors, and more) against a scoped list of internal hosts and IPs,
+    fingerprints findings over time so noise doesn't repeat, and ships new or
+    changed findings to the Lorikeet Security platform — or to stdout if you are
+    running standalone.
 
-    Start with `lk-exporter validate` to verify config and platform credentials.
-    Use `run` for continuous collection, `run --once` for cron/systemd, and
-    `run -v` for verbose output. `mcp` starts the MCP server only (for Claude
-    Desktop or Lory); `run --agent-mode` runs collection and MCP together.
+    \b
+    ──────────────────────────────────────────────────────────────────────────────
+    QUICK-START WORKFLOW
+    ──────────────────────────────────────────────────────────────────────────────
+      1.  Edit config.yaml — set scope, license_key, agent_token, modules.
+      2.  lk-exporter validate         — confirm config + platform creds are OK.
+      3.  lk-exporter run              — start continuous collection.
+          lk-exporter run --once       — one shot (use for cron / systemd timer).
+          lk-exporter run -v           — verbose: see every finding as it arrives.
+          lk-exporter run --agent-mode — also start the MCP server for Lory / AI.
+          lk-exporter mcp              — MCP server only, no background collection.
+
+    \b
+    ──────────────────────────────────────────────────────────────────────────────
+    CONFIGURATION FILE  (config.yaml)
+    ──────────────────────────────────────────────────────────────────────────────
+    By default the agent reads `config.yaml` in the current directory. Override
+    with `--config /path/to/config.yaml` on `run`, `validate`, or `mcp`.
+
+    \b
+    Required fields:
+      agent_id              Unique identifier for this agent instance (any string).
+      license_key           Your Lorikeet Security platform licence key.
+      agent_token           Per-agent API token from the platform dashboard.
+      scope                 List of CIDRs, single IPs, or hostnames to scan.
+                            Example: ["10.0.0.0/8", "192.168.1.50", "corp.internal"]
+      modules               List of collectors to enable.
+                            Example: ["port_scan", "tls", "cve", "dns"]
+
+    \b
+    Optional fields:
+      platform_url          Ingest endpoint. Omit to run in standalone/stdout mode.
+      interval              Loop cadence, e.g. "5m", "30m", "1h". Default: "5m".
+      log_level             "debug" | "info" | "warning" | "error". Default: "warning".
+      peers                 Sibling-agent coordinator URLs for multi-agent mesh.
+      coordinator_port      Port for the coordinator API (default: disabled).
+      peer_secret           Shared HMAC secret for peer authentication.
+      webhooks              HTTP endpoints to POST new/changed findings to.
+      auto_close_enabled    true/false — auto-resolve absent findings. Default: false.
+      auto_close_grace_cycles  Cycles before closing an absent finding. Default: 3.
+
+    \b
+    ──────────────────────────────────────────────────────────────────────────────
+    AVAILABLE COMMANDS
+    ──────────────────────────────────────────────────────────────────────────────
+      run        Run the collection agent (continuous loop or one-shot).
+      validate   Check config, scope, and platform credentials without scanning.
+      mcp        Start only the MCP stdio server — no background collection.
+
+    \b
+    ──────────────────────────────────────────────────────────────────────────────
+    DEPLOYMENT PATTERNS
+    ──────────────────────────────────────────────────────────────────────────────
+    Systemd service  — use `run` (continuous); let systemd handle restarts.
+    Cron job         — use `run --once`; cron provides scheduling.
+    Docker           — mount config.yaml to /app/config.yaml; run `run`.
+    AI integration   — use `run --agent-mode` so Lory can invoke on-demand scans.
+    Claude Desktop   — use `mcp`; point Claude's MCP config at the binary.
+
+    \b
+    ──────────────────────────────────────────────────────────────────────────────
+    NOTES
+    ──────────────────────────────────────────────────────────────────────────────
+    •  The agent only ever touches hosts listed in `scope`. Scope enforcement is
+       applied before every network call; requests outside scope are silently
+       dropped and logged.
+    •  Findings are fingerprinted (asset + check type + key detail). Duplicates
+       are suppressed; only new or changed findings are shipped.
+    •  In standalone mode (no platform_url) findings are printed as JSON to stdout
+       — useful for piping into SIEM, Splunk, or local alerting.
+    •  Use `--test-config` on the root command for a 2-second smoke-test that
+       does not run any scans: `lk-exporter --test-config`
     """
 
 
@@ -122,12 +194,89 @@ def main() -> None:
 def run(once: bool, config_path: str, with_mcp: bool, verbose: bool) -> None:
     """Run the collection agent (continuous or one-shot).
 
+    This is the primary command. Loads config.yaml (or --config), validates
+    scope, connects to the platform (if configured), then runs all enabled
+    collector modules against every host in scope.
+
     \b
-    Modes:
-      default      continuous — loops at configured interval until stopped
-      --once       single cycle then exit (cron / systemd timer friendly)
-      --agent-mode collection + MCP stdio server for AI orchestration
-      -v           verbose logs and findings table printed each cycle
+    ──────────────────────────────────────────────────────────────────────────
+    OPERATING MODES
+    ──────────────────────────────────────────────────────────────────────────
+    (default)
+      Continuous loop — one cycle, wait `interval`, repeat until Ctrl-C /
+      SIGTERM. Use for long-running systemd services and Docker containers.
+    \b
+    --once
+      Single-cycle mode — one full pass across all modules and scoped hosts,
+      then exit (code 0 = success, 1 = error). Use for cron / systemd timers
+      or CI pipelines where an external scheduler owns the cadence.
+    \b
+    --agent-mode
+      Background collection loop + MCP stdio server running simultaneously.
+      The MCP server exposes tools an AI orchestrator (Lory, Claude Desktop,
+      any MCP host) can call for on-demand scans and findings queries. Do NOT
+      use in an interactive terminal — stdin/stdout carry JSON-RPC framing.
+    \b
+    -v / --verbose
+      Full DEBUG-level log output and a findings table printed every cycle.
+      Without this flag the agent is quiet; only warnings/errors are shown.
+
+    \b
+    ──────────────────────────────────────────────────────────────────────────
+    WHAT HAPPENS DURING A COLLECTION CYCLE
+    ──────────────────────────────────────────────────────────────────────────
+    1. Each enabled module runs (sequentially or in parallel, per config).
+    2. Modules probe only hosts/IPs inside the configured scope.
+    3. Raw results are fingerprinted (asset + check type + key detail).
+       Duplicate findings are suppressed — the same issue never floods
+       the platform with repeated entries.
+    4. New findings and changed findings (same fingerprint, different
+       severity/detail) are shipped to the platform or printed to stdout.
+    5. If auto_close is enabled, findings absent for auto_close_grace_cycles
+       consecutive cycles are automatically resolved on the platform.
+    6. Webhook targets (if configured) receive a POST per new finding.
+    7. Peer coordinators share finding state so sibling agents on other
+       network segments don't re-ship the same finding.
+
+    \b
+    ──────────────────────────────────────────────────────────────────────────
+    EXAMPLES
+    ──────────────────────────────────────────────────────────────────────────
+    # Continuous run — quiet, systemd restarts on failure
+    lk-exporter run
+    \b
+    # One shot — good for cron; exit code reflects success/failure
+    lk-exporter run --once
+    \b
+    # Verbose continuous — see every finding and debug log live
+    lk-exporter run -v
+    \b
+    # One shot, verbose, custom config path
+    lk-exporter run --once -v --config /etc/lk-exporter/prod.yaml
+    \b
+    # AI-assisted mode — Lory or Claude Desktop manages the process
+    lk-exporter run --agent-mode
+
+    \b
+    ──────────────────────────────────────────────────────────────────────────
+    OUTPUT / FINDINGS DESTINATION
+    ──────────────────────────────────────────────────────────────────────────
+    Platform mode  (platform_url set in config)
+      Findings POST to the Lorikeet Security ingest API and appear in the
+      dashboard under the agent's asset view. Requires license_key +
+      agent_token.
+    \b
+    Standalone mode  (no platform_url)
+      Each finding prints as a JSON object to stdout, one per line.
+      Pipe to jq, tee to a file, or forward to a SIEM:
+        lk-exporter run --once | jq .
+
+    \b
+    ──────────────────────────────────────────────────────────────────────────
+    EXIT CODES  (--once mode)
+    ──────────────────────────────────────────────────────────────────────────
+    0   Collection completed — findings may or may not have been found.
+    1   Fatal error — config invalid, platform unreachable, scope empty.
     """
     from lk_exporter.config import load
     from lk_exporter.scope import ScopeEnforcer
@@ -269,19 +418,6 @@ def run(once: bool, config_path: str, with_mcp: bool, verbose: bool) -> None:
         t.start()
         log.info("MCP server started on stdio")
 
-        if cfg.using_platform():
-            from lk_exporter.mcp.relay import AgentRelay
-            relay = AgentRelay(
-                platform_url=cfg.platform_url,   # type: ignore[arg-type]
-                license_key=cfg.license_key,     # type: ignore[arg-type]
-                agent_token=cfg.agent_token,     # type: ignore[arg-type]
-                agent_id=cfg.agent_id,
-            )
-            relay.start()
-            if not verbose:
-                console.print("[dim]  Lory relay active — agent tools available to AI engagements[/dim]")
-            log.info("Lory relay poller started")
-
     if once:
         scheduler.run_once()
     else:
@@ -294,13 +430,68 @@ def run(once: bool, config_path: str, with_mcp: bool, verbose: bool) -> None:
 def validate(config_path: str) -> None:
     """Check config, scope, and platform credentials without collecting.
 
-    \b
-    Checks:
-      config        parses correctly, required fields present
-      scope         non-empty, valid CIDRs / hostnames
-      platform      license key valid and endpoint reachable (if configured)
+    Performs a comprehensive pre-flight check and exits. No network scans are
+    run; no findings are generated. This is the recommended first step after
+    creating or editing config.yaml, and before every new deployment.
 
-    Run this before every new deployment.
+    \b
+    ──────────────────────────────────────────────────────────────────────────
+    CHECKS PERFORMED
+    ──────────────────────────────────────────────────────────────────────────
+    1. Config parsing
+       Loads config.yaml (or --config path) and checks for YAML syntax
+       errors, missing required keys (agent_id, license_key, agent_token,
+       scope, modules), and invalid field types.
+    \b
+    2. Scope validation
+       Verifies every entry in `scope` is a valid CIDR, IP address, or
+       resolvable hostname. Enumerates IPs implied by CIDR ranges and prints
+       the total host count so you can confirm scope is what you expect.
+       An empty or malformed scope is a fatal error — the agent refuses to
+       run without it.
+    \b
+    3. Platform credential check  (only if platform_url is configured)
+       Makes a single authenticated test call to the ingest endpoint using
+       your license_key and agent_token. Verifies:
+         •  The endpoint is reachable (network / firewall / TLS).
+         •  The license_key is valid and not expired.
+         •  The agent_token matches the correct organisation.
+       If platform_url is not set, this step is skipped with a note that
+       the agent will run in standalone / stdout mode.
+
+    \b
+    ──────────────────────────────────────────────────────────────────────────
+    EXAMPLES
+    ──────────────────────────────────────────────────────────────────────────
+    # Validate default config.yaml in current directory
+    lk-exporter validate
+    \b
+    # Validate a specific config file
+    lk-exporter validate --config /etc/lk-exporter/staging.yaml
+
+    \b
+    ──────────────────────────────────────────────────────────────────────────
+    EXAMPLE OUTPUT
+    ──────────────────────────────────────────────────────────────────────────
+    ✓ Config is valid
+    ✓ Scope: 3 entries, ~254 IPs enumerable
+    ✓ License key validated against https://platform.lorikeetsecurity.com
+    \b
+    Validation passed.
+
+    \b
+    ──────────────────────────────────────────────────────────────────────────
+    EXIT CODES
+    ──────────────────────────────────────────────────────────────────────────
+    0   All checks passed — safe to run the agent.
+    1   One or more checks failed — fix before running.
+
+    \b
+    ──────────────────────────────────────────────────────────────────────────
+    ALSO SEE
+    ──────────────────────────────────────────────────────────────────────────
+    `lk-exporter --test-config` is an in-process alias for this command that
+    works without specifying a subcommand. Both perform the same checks.
     """
     from lk_exporter.config import load
     from lk_exporter.scope import ScopeEnforcer
@@ -351,15 +542,104 @@ def validate(config_path: str) -> None:
 
 
 @main.command()
-@click.option("--config", "config_path", default="config.yaml", show_default=True)
+@click.option("--config", "config_path", default="config.yaml", show_default=True,
+              help="Path to the YAML config file.")
 def mcp(config_path: str) -> None:
     """MCP stdio server only — no scheduled collection.
 
-    Exposes agent tools to an MCP client (Claude Desktop, Lory, any MCP host)
-    over stdin/stdout. The client can trigger on-demand collection cycles,
-    run recon tools, query findings, and validate scope.
+    Starts the Model Context Protocol (MCP) server over stdin/stdout and blocks
+    until the client disconnects. No background collection loop is started — the
+    agent only acts when an MCP client explicitly calls one of the exposed tools.
 
-    For scheduled collection alongside MCP, use: lk-exporter run --agent-mode
+    Use this mode when an AI system (Lory, Claude Desktop, or any MCP-compatible
+    host) is the primary driver and you want the AI to decide when to collect,
+    not a fixed schedule.
+
+    \b
+    ──────────────────────────────────────────────────────────────────────────────
+    WHAT IS MCP?
+    ──────────────────────────────────────────────────────────────────────────────
+    Model Context Protocol is an open standard for connecting AI models to
+    external tools and data sources. An MCP client (like Claude Desktop or Lory)
+    launches lk-exporter as a subprocess, hands it stdin/stdout, and then sends
+    JSON-RPC messages to call tools and receive structured results.
+
+    The agent translates each tool call into real network activity against your
+    scoped hosts, then returns structured findings back to the AI. The AI can
+    reason about results, ask follow-up questions, and decide what to scan next.
+
+    \b
+    ──────────────────────────────────────────────────────────────────────────
+    TOOLS EXPOSED TO THE MCP CLIENT
+    ──────────────────────────────────────────────────────────────────────────
+    run_collection    Trigger a full collection cycle (all enabled modules).
+    run_module        Run a single named module against the current scope.
+    get_findings      Return open findings (filter by severity/module/asset).
+    validate_scope    Check whether a given host/IP is inside scope.
+    get_agent_status  Return agent ID, version, last-cycle time, finding count.
+    list_modules      List available collector modules and their status.
+
+    \b
+    ──────────────────────────────────────────────────────────────────────────
+    mcp  vs  run --agent-mode
+    ──────────────────────────────────────────────────────────────────────────
+    mcp
+      MCP server only — no autonomous scanning. The AI must explicitly call
+      a tool to trigger any network activity. Zero background work at startup.
+      Good when the AI is fully orchestrating the engagement and you don't
+      want unsolicited scans running between tool calls.
+    \b
+    run --agent-mode
+      Background collection loop (runs at configured interval) AND MCP server
+      simultaneously. The agent scans autonomously AND accepts AI tool calls.
+      Best for long-lived deployments where you want continuous posture
+      monitoring plus on-demand AI interaction.
+
+    \b
+    ──────────────────────────────────────────────────────────────────────────
+    HOW TO CONFIGURE IN CLAUDE DESKTOP
+    ──────────────────────────────────────────────────────────────────────────
+    Add to claude_desktop_config.json under "mcpServers":
+    \b
+      "lk-exporter": {
+        "command": "/usr/local/bin/lk-exporter",
+        "args": ["mcp", "--config", "/etc/lk-exporter/config.yaml"]
+      }
+    \b
+    Claude Desktop launches the process, connects over stdio, and exposes
+    lk-exporter tools in every conversation automatically.
+
+    \b
+    ──────────────────────────────────────────────────────────────────────────
+    HOW TO CONFIGURE FOR LORY
+    ──────────────────────────────────────────────────────────────────────────
+    In the Lorikeet Security platform → Agent Settings, set the agent command:
+    \b
+      lk-exporter run --agent-mode --config /path/to/config.yaml
+    \b
+    Lory connects over the platform relay (not direct stdio), so --agent-mode
+    is preferred over bare `mcp` for Lory-managed agents.
+
+    \b
+    ──────────────────────────────────────────────────────────────────────────
+    EXAMPLES
+    ──────────────────────────────────────────────────────────────────────────
+    # Start MCP server with default config
+    lk-exporter mcp
+    \b
+    # Start MCP server with a custom config path
+    lk-exporter mcp --config /etc/lk-exporter/config.yaml
+
+    \b
+    ──────────────────────────────────────────────────────────────────────────
+    NOTES
+    ──────────────────────────────────────────────────────────────────────────
+    •  stdin/stdout carry JSON-RPC 2.0 framing. Do NOT use interactively —
+       you will see raw protocol messages, not human-readable output.
+    •  Config is validated at startup; invalid config causes immediate exit(1).
+    •  Process exits cleanly when the MCP client closes the connection.
+    •  Scope enforcement applies to tool-triggered scans exactly as it does
+       for scheduled collection — out-of-scope requests are rejected.
     """
     from lk_exporter.config import load
     from lk_exporter.scope import ScopeEnforcer
