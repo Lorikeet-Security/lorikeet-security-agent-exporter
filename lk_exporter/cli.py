@@ -429,6 +429,18 @@ def run(once: bool, config_path: str, with_mcp: bool, verbose: bool) -> None:
         t.start()
         log.info("MCP server started on stdio")
 
+        if cfg.using_platform():
+            from lk_exporter.mcp.relay import ToolRelay
+            relay = ToolRelay(
+                platform_url=cfg.platform_url,  # type: ignore[arg-type]
+                agent_token=cfg.agent_token,     # type: ignore[arg-type]
+                license_key=cfg.license_key,     # type: ignore[arg-type]
+                agent_id=cfg.agent_id,
+                scope_enforcer=scope,
+            )
+            relay.start()
+            console.print("[green]●[/green]  Lory tool relay active — polling for pentest tool calls")
+
     if once:
         scheduler.run_once()
     else:
