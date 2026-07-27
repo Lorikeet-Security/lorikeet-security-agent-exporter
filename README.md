@@ -1,6 +1,6 @@
 # lorikeet-security-agent-exporter
 
-![Version](https://img.shields.io/badge/version-0.2.0a1-blueviolet)
+![Version](https://img.shields.io/badge/version-0.2.0a2-blueviolet)
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue)
 ![Status](https://img.shields.io/badge/status-alpha-orange)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -17,7 +17,14 @@ Think of it as a per-host posture sensor: persistent, lightweight, and built to 
 
 ---
 
-## What's new in 0.2.0a1
+## What's new in 0.2.0a2
+
+- **Patch data has its own destination.** The `patch` module's output and the posture collector's patch-compliance rollup are now posted to the platform's `/v1/patch` ingest, which drives the dedicated Patch Management page - per-host patch state and per-package rows - instead of landing in the generic finding queue. Discovery, inventory, supply chain, and other posture checks are unchanged. See [Ingest routing](#ingest-routing).
+- **Snapshot-based auto-resolve.** A host's patch findings are sent as a single payload rather than split across batches, so the platform can treat them as a complete snapshot and close out packages that are no longer reported.
+- **Graceful against older platforms.** If `/v1/patch` returns `404`, patch data falls back to `/v1/findings` for the rest of the run rather than being dropped.
+- **Richer host detail.** The patch collector now reports OS name and detected package manager, and sends a `total_pending` count alongside the capped package list so large update backlogs are not undercounted.
+
+### Previously in 0.2.0a1
 
 - **Phase 4 complete.** All orchestration features are now shipped: on-demand MCP collection, multi-agent mesh coordination, remediation-tracking auto-close, and HMAC-signed alerting webhooks.
 - **MCP relay refactor.** Pentest tools (port scanning, banner grabbing, web probing) have been removed from the exporter. Lory AI brings its own toolbelt and connects to the exporter solely for host posture data - cleaner separation of concerns, smaller attack surface on the deployed agent.
@@ -51,7 +58,7 @@ Collects OS patch levels and installed-package manifests, then maps them against
 Builds and maintains a running inventory of operating systems, installed software, running services, listening ports, and notable configuration. Detects configuration drift and inventory changes over time.
 
 ### Patch-management visibility
-Surfaces this host's patch compliance posture: whether it is current, lagging, or carrying known-exploited vulnerabilities. Across a fleet of agents, this feeds a network-wide compliance view in the platform.
+Surfaces this host's patch compliance posture: whether it is current, lagging, or carrying known-exploited vulnerabilities. Across a fleet of agents, this feeds a network-wide compliance view in the platform. Patch data is posted to a dedicated ingest path so it lands on the platform's Patch Management page as tracked per-host and per-package state, rather than as one-off findings - packages that stop being reported are resolved automatically. See [Ingest routing](#ingest-routing).
 
 ### Remediation tracking
 Findings are fingerprinted (asset + check type + key detail) and tracked across cycles. When a finding is absent for a configurable number of consecutive cycles it is automatically marked closed and a close notification is sent to the platform, so resolved issues don't linger in the queue.
@@ -118,9 +125,9 @@ flowchart TB
 | Module         | Collects                                                                 | Notes |
 | -------------- | ------------------------------------------------------------------------ | ----- |
 | `discovery`    | Local open ports, listening services, service versions, port churn - **and** local npm manifest crawl, OSV CVE lookup, malicious-package detection | Baseline module; recommended always-on. Supply chain analysis is built into this module and runs automatically with no extra config. |
-| `patch`        | OS patch level, installed-package manifest, CVE mapping, EOL software    | Severity- and exploitability-prioritized |
+| `patch`        | OS patch level, OS name, package manager, installed-package manifest, CVE mapping, EOL software | Severity- and exploitability-prioritized. Routed to the platform's Patch Management ingest, not the finding queue |
 | `inventory`    | OS/version, installed software, running services, config drift           | Tracks change over time |
-| `posture`      | Patch-compliance rollup across the fleet, known-exploited flags          | Built on `patch` + `inventory` output; always runs last |
+| `posture`      | Patch-compliance rollup across the fleet, known-exploited flags          | Built on `patch` + `inventory` output; always runs last. The `patch-compliance-rollup` finding is routed to Patch Management; other posture checks go to the finding queue |
 
 Modules are selected in configuration via the `modules` setting. Disabled modules consume no resources and contact no hosts.
 
@@ -266,12 +273,16 @@ Configuration is supplied via a YAML config file (default `config.yaml`) or envi
 | Path | Carries | Lands in |
 | ---- | ------- | -------- |
 | `/v1/patch` | the `patch` module's output plus the posture collector's `patch-compliance-rollup` | the platform's **Patch Management** page (host patch state + per-package rows) |
-| `/v1/findings` | everything else — discovery, inventory, supply chain, other posture checks | the platform's finding queue |
+| `/v1/findings` | everything else - discovery, inventory, supply chain, other posture checks | the platform's finding queue |
 
 A host's patch findings are always sent as a single payload rather than split
 across batches: the platform treats a payload containing `patch-state` as a
 complete snapshot of that host and auto-resolves any package it no longer
 reports.
+
+If the platform has no `/v1/patch` endpoint, the first `404` falls back to
+`/v1/findings` and pins that choice for the rest of the run, so a newer agent
+never drops patch data against an older platform.
 
 ### Multi-agent mesh
 

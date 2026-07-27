@@ -12,6 +12,8 @@ from typing import TYPE_CHECKING
 
 import httpx
 
+from lk_exporter import __version__
+
 if TYPE_CHECKING:
     from lk_exporter.schema import Finding
 
@@ -62,7 +64,7 @@ class PlatformTransport:
             "X-LK-License": self.license_key,
             "X-LK-Agent-ID": self.agent_id,
             "Content-Type": "application/json",
-            "User-Agent": "lk-exporter/0.1.0",
+            "User-Agent": f"lk-exporter/{__version__}",
         }
 
     def validate(self) -> None:
