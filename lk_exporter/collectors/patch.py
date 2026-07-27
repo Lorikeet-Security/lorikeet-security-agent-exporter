@@ -89,6 +89,16 @@ class PatchCollector(BaseCollector):
         except (FileNotFoundError, subprocess.SubprocessError):
             pass
 
+        # OS identity and package manager — the platform's Patch Management
+        # page keys host records off these.
+        os_release = self._read_os_release()
+        if os_release.get("pretty_name"):
+            info["os"] = os_release["pretty_name"]
+        for mgr in ("apt-get", "dnf", "yum", "zypper", "apk"):
+            if shutil.which(mgr):
+                info["package_manager"] = mgr
+                break
+
         # Last apt/yum update time
         if shutil.which("apt-get"):
             try:
@@ -121,7 +131,9 @@ class PatchCollector(BaseCollector):
             category="pending-updates",
             severity=severity,  # type: ignore[arg-type]
             title=f"{len(updates)} pending package update(s)",
-            evidence={"pending_packages": updates[:100]},
+            # The package list is capped so the payload stays small; total_pending
+            # carries the real count so the platform does not undercount.
+            evidence={"pending_packages": updates[:100], "total_pending": len(updates)},
         )
         return [self._stamp(f)]
 
