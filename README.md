@@ -259,6 +259,20 @@ Configuration is supplied via a YAML config file (default `config.yaml`) or envi
 | `concurrency`  | no       | `LK_CONCURRENCY` | Max parallel host operations per cycle (default: `16`) |
 | `log_level`    | no       | `LK_LOG_LEVEL` | `info` (default), `debug`, `warn`, `error` |
 
+#### Ingest routing
+
+`platform_url` is a base; the agent posts to two paths beneath it:
+
+| Path | Carries | Lands in |
+| ---- | ------- | -------- |
+| `/v1/patch` | the `patch` module's output plus the posture collector's `patch-compliance-rollup` | the platform's **Patch Management** page (host patch state + per-package rows) |
+| `/v1/findings` | everything else — discovery, inventory, supply chain, other posture checks | the platform's finding queue |
+
+A host's patch findings are always sent as a single payload rather than split
+across batches: the platform treats a payload containing `patch-state` as a
+complete snapshot of that host and auto-resolves any package it no longer
+reports.
+
 ### Multi-agent mesh
 
 | Setting | Required | Env var | Description |
