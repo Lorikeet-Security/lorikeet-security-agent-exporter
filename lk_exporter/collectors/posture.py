@@ -3,6 +3,11 @@
 Aggregates findings from the patch and inventory modules to produce a
 fleet-level compliance picture. Runs after (and consumes output from)
 patch and inventory.
+
+The rollup is advisory. The platform computes the compliance score and its
+band from the findings themselves — this label used to be rendered next to
+that score on the same host card and routinely disagreed with it, so a host
+could read "82" in green and "Poor" in the same breath.
 """
 
 from __future__ import annotations
@@ -56,8 +61,10 @@ class PostureCollector(BaseCollector):
             if f.severity in ("critical", "high"):
                 critical_items.append(f.title)
 
+        # total_pending, not len(pending_packages): the shipped list is capped,
+        # so counting it under-reported every host that exceeded the cap.
         pending_count = sum(
-            len(f.evidence.get("pending_packages", []))
+            int(f.evidence.get("total_pending", len(f.evidence.get("pending_packages", []))))
             for f in sub_findings
             if f.category == "pending-updates"
         )
