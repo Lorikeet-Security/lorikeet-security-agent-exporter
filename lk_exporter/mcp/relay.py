@@ -86,6 +86,13 @@ class ToolRelay:
         url = self.base_url + _QUEUE_PATH
         with httpx.Client(timeout=15, verify=True) as client:
             resp = client.get(url, headers=self._headers())
+        if resp.is_redirect:
+            log.warning(
+                "tool-queue HTTP %d -> %s; the relay base URL has moved, update "
+                "platform_url in your config",
+                resp.status_code, resp.headers.get("location", "?"),
+            )
+            return False
         if resp.status_code != 200:
             log.warning("tool-queue HTTP %d", resp.status_code)
             return False

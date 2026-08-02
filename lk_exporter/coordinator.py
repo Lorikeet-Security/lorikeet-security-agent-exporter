@@ -44,6 +44,8 @@ log = logging.getLogger("lk_exporter.coordinator")
 
 _API_PREFIX = "/v1/coordinator"
 _PULL_TIMEOUT_S = 10.0
+# Consecutive failed pulls before a peer is reported as misconfigured.
+_FAILURE_ESCALATE_AFTER = 3
 
 # State written by the scheduler after each cycle; read by server handlers
 _shared: dict[str, Any] = {
@@ -261,6 +263,9 @@ class PeerClient:
         self.peer_urls  = peer_urls
         self.peer_secret = peer_secret
         self.tls_verify  = tls_verify
+        # Consecutive failed pulls per peer. A misconfigured peer fails the
+        # same way forever, and one warning per cycle reads as transient.
+        self._failures: dict[str, int] = {}
 
     def _ssl_ctx(self) -> ssl.SSLContext:
         ctx = ssl.create_default_context()
@@ -331,12 +336,31 @@ class PeerClient:
             if url.startswith("https://"):
                 kwargs["context"] = self._ssl_ctx()
             with urlopen(req, **kwargs) as resp:
-                return json.loads(resp.read())
+                data = json.loads(resp.read())
         except URLError as exc:
-            log.warning("Peer %s/%s unreachable: %s", peer_url, endpoint, exc)
+            self._record_failure(peer_url, endpoint, f"unreachable: {exc}")
+            return None
         except Exception as exc:
-            log.warning("Peer %s/%s error: %s", peer_url, endpoint, exc)
-        return None
+            self._record_failure(peer_url, endpoint, f"error: {exc}")
+            return None
+
+        if self._failures.pop(peer_url, 0):
+            log.info("Peer %s recovered", peer_url)
+        return data
+
+    def _record_failure(self, peer_url: str, endpoint: str, detail: str) -> None:
+        n = self._failures[peer_url] = self._failures.get(peer_url, 0) + 1
+        if n < _FAILURE_ESCALATE_AFTER:
+            log.warning("Peer %s/%s %s", peer_url, endpoint, detail)
+        elif n == _FAILURE_ESCALATE_AFTER:
+            log.error(
+                "Peer %s has failed %d consecutive pulls (%s). This peer is "
+                "contributing nothing; check that the URL is the peer agent's "
+                "own address and coordinator_port, and that it is https://.",
+                peer_url, n, detail,
+            )
+        # Past the threshold the diagnosis will not change, so stay quiet
+        # rather than repeating an error every cycle.
 
 
 # ---------------------------------------------------------------------------

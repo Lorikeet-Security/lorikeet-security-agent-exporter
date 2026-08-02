@@ -85,6 +85,15 @@ class PlatformTransport:
             raise LicenseError("License key rejected: unauthorized (check LK_LICENSE_KEY)")
         if resp.status_code == 403:
             raise LicenseError("License key is expired or revoked")
+        if resp.is_redirect:
+            # Redirects are never followed: httpx downgrades POST to GET on
+            # 301/302/303, which would silently drop a findings body and still
+            # report success. A moved ingest path must be fixed in config.
+            raise TransportError(
+                f"Platform redirected {url} -> {resp.headers.get('location', '?')} "
+                f"(HTTP {resp.status_code}). The ingest path has moved; update "
+                f"platform_url in your config to the new base URL."
+            )
         if resp.status_code != 200:
             raise TransportError(f"Validation failed: HTTP {resp.status_code}")
 

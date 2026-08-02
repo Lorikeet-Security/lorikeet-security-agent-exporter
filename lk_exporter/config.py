@@ -14,6 +14,7 @@ import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 import yaml
 
@@ -91,6 +92,63 @@ class Config:
     def using_platform(self) -> bool:
         return bool(self.platform_url)
 
+    def _peer_errors(self) -> list[str]:
+        """Validate peer coordinator URLs.
+
+        An unusable peer URL is otherwise invisible: the pull just times out
+        every cycle and logs one vague warning, so a mesh can look configured
+        while never exchanging anything. These are all cases where no amount
+        of waiting will ever produce a connection.
+        """
+        errors: list[str] = []
+
+        for peer in self.peers:
+            parsed = urlparse(peer if "//" in peer else f"//{peer}")
+
+            if parsed.scheme == "http":
+                # CoordinatorServer always wraps its socket in TLS, so a
+                # plaintext peer URL can never complete a handshake.
+                errors.append(
+                    f"Peer {peer!r} uses http://; the coordinator is TLS-only, use https://"
+                )
+            elif parsed.scheme != "https":
+                errors.append(
+                    f"Peer {peer!r} must be an https:// URL"
+                    + (f" (got {parsed.scheme!r})" if parsed.scheme else "")
+                )
+
+            try:
+                host, port = parsed.hostname, parsed.port
+            except ValueError:                     # non-numeric / out-of-range port
+                errors.append(f"Peer {peer!r} has an invalid port")
+                continue
+
+            if not host:
+                errors.append(f"Peer {peer!r} has no host")
+                continue
+            if port is None:
+                errors.append(
+                    f"Peer {peer!r} has no port; specify the peer's coordinator_port"
+                )
+
+            try:
+                addr = ipaddress.ip_address(host)
+            except ValueError:
+                continue                           # hostname, not a literal address
+
+            if addr.is_unspecified or addr.is_multicast or addr.is_reserved:
+                errors.append(f"Peer {peer!r} is not a routable host address")
+            elif addr.version == 4 and int(addr) & 0xFF == 0:
+                # x.y.z.0 is the network address of the /24 it sits in. It is
+                # legal only in a wider prefix, and in practice it is a
+                # transcribed CIDR base that will never answer.
+                errors.append(
+                    f"Peer {peer!r} looks like a network address, not a host; "
+                    "use the peer agent's own address"
+                )
+
+        return errors
+
     def validate(self) -> list[str]:
         errors: list[str] = []
 
@@ -111,6 +169,8 @@ class Config:
         if self.coordinator_port is not None:
             if not (1 <= self.coordinator_port <= 65535):
                 errors.append("coordinator_port must be between 1 and 65535")
+
+        errors.extend(self._peer_errors())
 
         if self.auto_close_grace_cycles < 1:
             errors.append("auto_close_grace_cycles must be >= 1")
