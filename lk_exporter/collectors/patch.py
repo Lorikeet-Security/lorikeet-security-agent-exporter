@@ -288,16 +288,41 @@ class PatchCollector(BaseCollector):
         out = _run(["apt-get", "--simulate", "upgrade"], timeout=90)
         if not out:
             return []
+
+        # CVE findings are keyed by source package (that is how the distro
+        # trackers publish them), while apt talks in binaries. Shipping the
+        # source name alongside lets the platform connect "this package has an
+        # open CVE" to "and here is the upgrade that ships it" — without it the
+        # two lists cannot be joined and every CVE reads as unfixable.
+        sources = self._binary_to_source()
+
         pkgs = []
         for line in out.splitlines():
             m = re.match(r"Inst\s+(\S+)\s+\[([^\]]+)\]\s+\((\S+)", line)
             if m:
-                pkgs.append({
-                    "name": m.group(1),
+                name = m.group(1)
+                entry = {
+                    "name": name,
                     "installed": m.group(2),
                     "available": m.group(3),
-                })
+                }
+                source = sources.get(name)
+                if source and source != name:
+                    entry["source"] = source
+                pkgs.append(entry)
         return pkgs
+
+    def _binary_to_source(self) -> dict[str, str]:
+        """Map installed binary package names to their source package."""
+        if not shutil.which("dpkg-query"):
+            return {}
+        out = _run(["dpkg-query", "-W", "-f=${Package}\t${source:Package}\n"], timeout=120)
+        mapping: dict[str, str] = {}
+        for line in (out or "").splitlines():
+            parts = line.split("\t")
+            if len(parts) == 2 and parts[0] and parts[1]:
+                mapping[parts[0]] = parts[1]
+        return mapping
 
     def _pending_yum(self, cmd: str) -> list[dict[str, str]]:
         # check-update exits 100 when updates exist, which is why _run() does
