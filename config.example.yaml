@@ -10,7 +10,7 @@ scope:
   # - 10.10.1.5   # single hosts are allowed too
 
 # Platform ingest endpoint. Omit to run standalone (findings logged locally only).
-platform_url: https://lorikeetsecurity.com/ingest
+platform_url: https://lorikeetsecurity.com/talon/ingest
 
 # License key - required only for platform ingest. Supply via env: LK_LICENSE_KEY
 license_key: ${LK_LICENSE_KEY}

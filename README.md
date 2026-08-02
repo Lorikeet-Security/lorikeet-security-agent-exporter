@@ -311,7 +311,7 @@ never drops patch data against an older platform.
 scope:
   - 10.0.0.0/16
   - 192.168.50.0/24
-platform_url: https://lorikeetsecurity.com/ingest
+platform_url: https://lorikeetsecurity.com/talon/ingest
 license_key: ${LK_LICENSE_KEY}
 agent_token: ${LK_AGENT_TOKEN}
 interval: 6h
