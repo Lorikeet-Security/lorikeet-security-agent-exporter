@@ -117,3 +117,45 @@ def test_env_token_expansion(tmp_path, monkeypatch):
     cfg = load(p)
     assert cfg.license_key == f"lk_lic_{'c' * 32}"
     assert cfg.validate() == []
+
+
+# --- Peer URL validation ---------------------------------------------------
+
+def _peer_errors(peers):
+    return "\n".join(Config(scope=["10.0.0.0/8"], peers=peers).validate())
+
+
+def test_https_peer_with_port_is_valid():
+    assert _peer_errors(["https://10.1.0.5:8765"]) == ""
+
+
+def test_http_peer_is_rejected_because_coordinator_is_tls_only():
+    errs = _peer_errors(["http://66.228.57.68:9500"])
+    assert "TLS-only" in errs and "https://" in errs
+
+
+def test_network_address_peer_is_rejected():
+    # The exact misconfiguration seen in the field: the scope CIDR base was
+    # pasted in as a peer, so every pull timed out forever.
+    errs = _peer_errors(["https://192.168.1.0:9501"])
+    assert "network address" in errs
+
+
+def test_peer_without_port_is_rejected():
+    assert "no port" in _peer_errors(["https://10.1.0.5"])
+
+
+def test_peer_with_bad_port_is_rejected():
+    assert "invalid port" in _peer_errors(["https://10.1.0.5:notaport"])
+
+
+def test_unroutable_peer_is_rejected():
+    assert "routable" in _peer_errors(["https://0.0.0.0:8765"])
+
+
+def test_hostname_peer_is_allowed():
+    assert _peer_errors(["https://dmz-agent.internal:8765"]) == ""
+
+
+def test_no_peers_produces_no_peer_errors():
+    assert _peer_errors([]) == ""
